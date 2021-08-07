@@ -29,6 +29,8 @@ def call_POI_service(poi_):
     except rospy.ServiceException as e:
         print('Service call failed: {e}'.format(e=e))
 
+def get_table_to_serve():
+    pass
 
 # Creating the States
 
@@ -38,7 +40,7 @@ class Navigate(smach.State):
     def __init__(self, poi):
         # from here we define the possible outcomes of the state.
         super().__init__(
-            outcomes=['shop_explore_done', 'at_POI'], output_keys=['current_poi'])
+            outcomes=['shop_explore_done', 'at_POI'], output_keys=['current_poi'], input_keys=['phase_no'])
         self.poi = poi[1:]
         self.counter = poi[0]
 
@@ -83,7 +85,7 @@ def hri_result_cb(userdata, status, result):
 hri_state = SimpleActionState('hri', HRIAction,
                               goal_cb=hri_goal_cb,
                               result_cb=hri_result_cb,
-                              input_keys=['current_poi'])
+                              input_keys=['current_poi', 'phase_no'])
 
 # PEOPLE PERCEPTION
 
@@ -106,7 +108,8 @@ def people_percept_result_cb(userdata, status, result):
 people_percept_state = SimpleActionState('people_percept', PeoplePerceptionAction,
                                          goal=people_percept_goal,
                                          result_cb=people_percept_result_cb,
-                                         output_keys=['no_of_people'])
+                                         output_keys=['no_of_people'],
+                                         input_keys=['phase_no'])
 
 # OBJECT PERCEPTION
 
@@ -124,13 +127,14 @@ def object_percept_result_cb(userdata, status, result):
 object_percept_state = SimpleActionState('object_percept', ObjectPerceptionAction,
                                          goal=object_percept_goal,
                                          result_cb=object_percept_result_cb,
-                                         output_keys=['no_of_object'])
+                                         output_keys=['no_of_object'],
+                                         input_keys=['phase_no'])
 
 
 # Setting up the request callback for the Save POI State service
 
 
-@smach.cb_interface(input_keys=['table_object_state', 'table_people_state', 'current_poi'])
+@smach.cb_interface(input_keys=['table_object_state', 'table_people_state', 'current_poi', 'phase_no'])
 def poi_state_request_cb(userdata, request):
     poi_state_request = POIState()
     poi_state_request.table_id = userdata.current_poi
@@ -170,33 +174,37 @@ if __name__ == '__main__':
 
     with Trial:
 
-        Phase1 = smach.StateMachine(outcomes=['finished', 'failed'])
+        Phase1 = smach.StateMachine(
+            outcomes=['finished', 'failed'], output_keys=['phase_value'])
+        Phase1.userdata.phase_value = 1
 
         # Open the container
         with Phase1:
 
             # Add states to the container
             smach.StateMachine.add('NAVIGATION', Navigate(
-                poi), {'shop_explore_done': 'HRI', 'at_POI': 'PEOPLE_PERCEPTION'},)
+                poi), {'shop_explore_done': 'HRI', 'at_POI': 'PEOPLE_PERCEPTION'},
+                remapping={'phase_no': 'phase_value'})
 
             smach.StateMachine.add('PEOPLE_PERCEPTION',
                                    people_percept_state,
                                    transitions={
                                        'people_present': 'HRI', 'people_not_precent': 'OBJECT_PERCEPTION'},
-                                   remapping={'no_of_people': 'table_people_state'})
+                                   remapping={'no_of_people': 'table_people_state', 'phase_no': 'phase_value'})
 
             smach.StateMachine.add('OBJECT_PERCEPTION',
                                    object_percept_state,
                                    transitions={
                                        'object_detect_done': 'SAVE_POI_STATE'},
-                                   remapping={'no_of_object': 'table_object_state'})
+                                   remapping={'no_of_object': 'table_object_state', 'phase_no': 'phase_value'})
 
             smach.StateMachine.add('HRI', hri_state,
-                                   transitions={'greeted': 'OBJECT_PERCEPTION', 'announced': 'finished'})
+                                   transitions={'greeted': 'OBJECT_PERCEPTION', 'announced': 'finished'}, remapping={'phase_no': 'phase_value'})
 
             smach.StateMachine.add('SAVE_POI_STATE',
                                    poi_state_state,
-                                   transitions={'saved': 'NAVIGATION'})
+                                   transitions={'saved': 'NAVIGATION'},
+                                   remapping={'phase_no': 'phase_value'})
 
         smach.StateMachine.add('PHASE_1', Phase1,
                                transitions={'finished': 'PHASE_2'})
