@@ -1,0 +1,3 @@
+[submodule "sciroc_navigation"]
+	path = sciroc_navigation
+	url = https://github.com/Omotoye/sciroc_navigation.git
