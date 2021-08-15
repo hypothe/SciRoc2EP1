@@ -58,6 +58,7 @@ add_service_files(
    FILES
    SetPOIState.srv
    UpdatePOIState.srv
+   GetTableByState.srv
  )
 
 ## Generate actions in the 'action' folder

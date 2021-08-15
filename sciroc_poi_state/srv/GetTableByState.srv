@@ -1,0 +1,14 @@
+string table_state
+---
+string table_id
+uint8 no_of_people 
+uint8 no_of_object
+bool need_serving 
+bool need_cleaning 
+bool require_order 
+bool already_served 
+string[] required_drinks
+uint8 need_serving_no
+uint8 need_cleaning_no
+uint8 require_order_no
+uint8 already_served_no 

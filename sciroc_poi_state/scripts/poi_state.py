@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import rospy
-from sciroc_poi_state.srv import SetPOIState, GetPOIState, UpdatePOIState
-from sciroc_poi_state.srv import SetPOIStateResponse, GetPOIStateResponse, UpdatePOIStateResponse
+from sciroc_poi_state.srv import SetPOIState, UpdatePOIState, GetTableByState
+from sciroc_poi_state.srv import SetPOIStateResponse, UpdatePOIStateResponse, GetTableByStateResponse
 
 # Brings in the messages used by the go_to_poi service
 
@@ -76,11 +76,6 @@ def set_poi_state(req):
     return SetPOIStateResponse('saved')
 
 
-def get_poi_state(req):
-    # Do something
-    return GetPOIStateResponse()
-
-
 def update_poi_state(req):
     global POI
     table_id = req.table_id
@@ -89,12 +84,17 @@ def update_poi_state(req):
         response = 'updated'
     return UpdatePOIStateResponse(response)
 
+def get_table_by_state(req):
+    # Do something
+    return GetTableByStateResponse()
+
 
 def main():
     rospy.init_node('POI_state')
     s1 = rospy.Service('set_poi_state', SetPOIState, set_poi_state)
-    s2 = rospy.Service('get_poi_state', GetPOIState, get_poi_state)
-    s3 = rospy.Service('update_poi_state', UpdatePOIState, update_poi_state)
+    s2 = rospy.Service('update_poi_state', UpdatePOIState, update_poi_state)
+    s3 = rospy.Service('get_table_by_state', GetTableByState, get_table_by_state)
+
     rospy.spin()
 
 
