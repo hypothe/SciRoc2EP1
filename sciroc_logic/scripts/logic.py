@@ -21,17 +21,17 @@ class Navigate(smach.State):
     def __init__(self, poi):
         # from here we define the possible outcomes of the state.
         super().__init__(
-            outcomes=['shop_explore_done', 'at_POI'], output_keys=['current_poi'], input_keys=['phase_no'])
+            outcomes=['shop_explore_done', 'at_POI'], output_keys=['current_poi', 'current_task'], input_keys=['phase_no', 'current_task'])
         self.poi = poi[1:]
         self.counter = poi[0]
 
-    def _call_POI_service(self):
+    def _call_POI_service(self, poi):
         """To initialize and call the go_to_poi service
         """
         rospy.wait_for_service('go_to_poi_service')
         try:
             go_to_poi = rospy.ServiceProxy('go_to_poi_service', GoToPOI)
-            result = go_to_poi(self.poi)
+            result = go_to_poi(poi)
 
             if (result.result == 'goal reached'):
                 print(result.result)
@@ -51,6 +51,14 @@ class Navigate(smach.State):
             return state
         except rospy.ServiceException as e:
             print('Service call failed: {e}'.format(e=e))
+
+    def get_need_order(self):
+        state = self._call_POI_state()
+        if (state.need_order_no > 0):
+            table_id = state.table_id
+            return table_id
+        else:
+            return 'All order taken'
 
     def get_table_to_serve(self):
         state = self._call_POI_state()
@@ -79,8 +87,8 @@ class Navigate(smach.State):
                     return 'at_POI'
 
         elif (userdata.phase_no == 2):
-            table = self.get_table_to_serve()
-            if (table == 'All Served'):
+            table = self.get_need_order()
+            if (table == 'All order taken'):
                 return 'take_order_done'
             else:
                 result = self._call_POI_service(table)
@@ -89,7 +97,25 @@ class Navigate(smach.State):
                     return 'at_POI'
 
         elif (userdata.phase_no == 3):
-            pass
+            if (userdata.task == 'report order'):
+                result = self._call_POI_service(self.counter)
+                if result:
+                    userdata.current_poi = self.counter
+                    return 'at_counter'
+            if (userdata.task == 'deliver order'):
+                table = self.get_table_to_serve()
+                if (table == 'All Served'):
+                    return 'all served'
+                else:
+                    result = self._call_POI_service(table)
+                    if result:
+                        userdata.current_poi = table
+                        return 'at_POI'
+            if (userdata.task == 'to default location'):
+                result = self._call_POI_service(self.counter)
+                if result:
+                    userdata.current_poi = self.counter
+                    return 'at_default_location'
 
 
 class POI_State(smach.State):
@@ -175,7 +201,13 @@ def hri_goal_cb(userdata, goal):
         hri_goal.task = 'take_order'
         return hri_goal
     elif(userdata.phase_no == 3):
-        pass
+        if (userdata.task == 'report order'):
+            hri_goal.task = 'report order'
+        if (userdata.task == 'take item'):
+            hri_goal.task = 'take item'
+        if (userdata.task == 'deliver drink'):
+            hri_goal.task = 'deliver drink'
+        return hri_goal
 
 
 def hri_result_cb(userdata, status, result):
@@ -189,13 +221,24 @@ def hri_result_cb(userdata, status, result):
         if status == GoalStatus.SUCCEEDED:
             return 'order_taken'
     elif (userdata.phase_no == 3):
-        pass
+        if status == GoalStatus.SUCCEEDED:
+            if (result == 'order_reported'):
+                userdata.current_task == 'check object'
+                return 'order_reported'
+            if (result == 'item taken'):
+                userdata.current_task == 'deliver order'
+                return 'object_taken'
+            if (result == 'item delivered'):
+                userdata.current_task == 'to default location'
+                return 'object_delivered'
 
 
 hri_state = SimpleActionState('hri', HRIAction,
                               goal_cb=hri_goal_cb,
                               result_cb=hri_result_cb,
-                              input_keys=['current_poi', 'phase_no'])
+                              input_keys=['current_poi',
+                                          'phase_no', 'current_task'],
+                              output_keys=['current_task'])
 
 # PEOPLE PERCEPTION
 
@@ -310,16 +353,6 @@ if __name__ == '__main__':
                 poi), {'take_order_done': 'finished', 'at_POI': 'TAKE_ORDER'},
                 remapping={'phase_no': 'phase_value'})
 
-            # take_order = smach.StateMachine(outcomes=['finished', 'failed'])
-
-            # with take_order:
-            #     smach.StateMachine.add('GREET', hri_state,
-            #                            transitions={'greeted':'ASK_FOR_ORDER'}, remapping={'phase_no':'phase_value'})
-            #     smach.StateMachine.add('ASK_FOR_ORDER', hri_state,
-            #                            transitions={'success':'TAKE_ORDER'})
-            #     smach.StateMachine.add('RECORD_ORDER', hri_state,
-            #                            transitions={'success':'finished'})
-
             smach.StateMachine.add('TAKE_ORDER', hri_state,
                                    transitions={'order_taken': 'NAVIGATION'})
 
@@ -327,14 +360,22 @@ if __name__ == '__main__':
                                    transitions={'updated': 'NAVIGATION'})
 
         Phase3 = smach.StateMachine(
-            outcomes=['finished', 'failed'], output_keys=['phase_value'])
+            outcomes=['finished', 'failed'], output_keys=['phase_value', 'task'])
         Phase3.userdata.phase_value = 3
+        Phase3.userdata.task = 'report order'
 
         # Open the container
         with Phase3:
-            smach.StateMachine.add()
-            smach.StateMachine.add()
-            smach.StateMachine.add()
+            smach.StateMachine.add('NAVIGATION', Navigate(
+                poi), {'at_counter': 'HRI', 'at_POI': 'HRI', 'at_default_location': 'finished'},
+                remapping={'phase_no': 'phase_value', 'current_task': 'task'})
+            smach.StateMachine.add('HRI', hri_state,
+                                   transitions={'order_reported': 'OBJECT_PERCEPTION', 'object_taken': 'NAVIGATION', 'object_delivered': 'NAVIGATION'})
+            smach.StateMachine.add('OBJECT_PERCEPTION',
+                                   object_percept_state,
+                                   transitions={
+                                       'missing_object': 'HRI', 'object_ok': 'HRI'},
+                                   remapping={'no_of_object': 'table_object_state', 'phase_no': 'phase_value'})
 
     # Execute SMACH plan
     outcome = Trial.execute()
