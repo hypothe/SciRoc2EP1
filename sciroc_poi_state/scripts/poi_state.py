@@ -8,8 +8,8 @@ from sciroc_poi_state.srv import SetPOIStateResponse, UpdatePOIStateResponse, Ge
 
 POI = {}  # for storing all the table objects
 
-table_states = {'ready': [], 'need serving': [],
-                'already served': [], 'need cleaning': []}
+table_states = {'require order': [], 'need serving': [],
+                'already served': [], 'need cleaning': [], 'ready': []}
 
 
 class Table:
@@ -60,6 +60,8 @@ class Table:
             self.table_state = 'ready'
         if (self.need_serving == True and self.require_order == True and self.need_cleaning == False and self.already_served == False):
             self.table_state = 'need serving'
+        if (self.need_serving == True and self.require_order == False and self.need_cleaning == False and self.already_served == False):
+            self.table_state = 'need serving'
         if (self.need_serving == False and self.require_order == False and self.need_cleaning == False and self.already_served == True):
             self.table_state = 'already served'
         if (self.need_serving == False and self.require_order == False and self.need_cleaning == True and self.already_served == False):
@@ -89,12 +91,17 @@ def update_poi_state(req):
 
 
 def update_table_state_data():
-    global table_states
+    global table_states, POI
+    table_states = {'require order': [], 'need serving': [],
+                'already served': [], 'need cleaning': [], 'ready': []}
     for table_id in POI:
         table_states[POI[table_id].table_state].append(table_id)
+        if (POI[table_id].require_order):
+            table_states['require order'].append(table_id)
 
 
 def generate_table_response(req_mes):
+    global table_states, POI 
     table_response = GetTableByStateResponse()
     table_ids = table_states[req_mes.table_state]
 
@@ -121,7 +128,7 @@ def generate_table_response(req_mes):
 
 
 def get_table_by_state(req):
-    global POI
+    global table_states, POI
     update_table_state_data()
     table_response = generate_table_response(req)
     return table_response
