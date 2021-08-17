@@ -8,7 +8,7 @@ from sciroc_poi_state.srv import SetPOIStateResponse, UpdatePOIStateResponse, Ge
 POI = {}  # for storing all the table objects
 
 table_states = {'require order': [], 'need serving': [],
-                'already served': [], 'need cleaning': [], 'ready': []}
+                'already served': [], 'need cleaning': [], 'ready': [], 'current serving':[]}
 
 
 class Table:
@@ -20,6 +20,7 @@ class Table:
         self.need_cleaning = False
         self.require_order = False  # the customer needs the robot to take their order
         self.already_served = False
+        self.current_serving = False
         self.required_drinks = []
 
         if (no_of_people == 0 and no_of_object == 0):
@@ -54,6 +55,8 @@ class Table:
                 self.need_cleaning = req.need_cleaning
             elif state == 'already served':
                 self.already_served = req.already_served
+            elif state == 'current serving':
+                self.current_serving = req.current_serving
 
         if (self.need_serving == False and self.require_order == False and self.need_cleaning == False and self.already_served == False):
             self.table_state = 'ready'
@@ -92,11 +95,13 @@ def update_poi_state(req):
 def update_table_state_data():
     global table_states, POI
     table_states = {'require order': [], 'need serving': [],
-                'already served': [], 'need cleaning': [], 'ready': []}
+                'already served': [], 'need cleaning': [], 'ready': [], 'current serving':[]}
     for table_id in POI:
         table_states[POI[table_id].table_state].append(table_id)
         if (POI[table_id].require_order):
             table_states['require order'].append(table_id)
+        elif(POI[table_id].current_serving):
+            table_states['current serving'].append(table_id)
 
 
 def generate_table_response(req_mes):
@@ -112,17 +117,22 @@ def generate_table_response(req_mes):
         table_response.need_serving = table.need_serving
         table_response.need_cleaning = table.need_cleaning
         table_response.require_order = table.require_order
+        table_response.current_serving = table.current_serving
         table_response.already_served = table.already_served
         table_response.required_drinks = table.required_drinks
         table_response.need_serving_no = len(table_states['need serving'])
         table_response.need_cleaning_no = len(table_states['need cleaning'])
         table_response.require_order_no = len(table_states['require order'])
         table_response.already_served_no = len(table_states['already served'])
+        table_response.current_serving_no = len(table_states['current serving'])
+
     else:
         table_response.need_serving_no = len(table_states['need serving'])
         table_response.need_cleaning_no = len(table_states['need cleaning'])
         table_response.require_order_no = len(table_states['require order'])
         table_response.already_served_no = len(table_states['already served'])
+        table_response.current_serving_no = len(table_states['current serving'])
+
     return table_response
 
 

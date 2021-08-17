@@ -7,8 +7,10 @@ bool need_serving
 bool need_cleaning 
 bool require_order 
 bool already_served 
+bool current_serving 
 string[] required_drinks
 uint8 need_serving_no
 uint8 need_cleaning_no
 uint8 require_order_no
 uint8 already_served_no 
+uint8 current_serving_no
