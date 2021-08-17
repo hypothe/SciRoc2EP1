@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-from pickle import EMPTY_DICT
 import rospy
 import smach
 from smach_ros import ServiceState, SimpleActionState
 from std_msgs.msg import Empty
 from geometry_msgs.msg import Twist
-from smach import CBState
 from actionlib_msgs.msg._GoalStatus import GoalStatus
 # Brings in the messages used by the go_to_poi service
 from sciroc_navigation.srv import GoToPOI
+from sciroc_poi_state.srv import SetPOIState, UpdatePOIState, GetTableByState
+from sciroc_poi_state.srv import SetPOIStateRequest, UpdatePOIStateRequest
 
 
 # Creating the States
@@ -25,16 +25,15 @@ class Navigate(smach.State):
         self.poi = poi[1:]
         self.counter = poi[0]
 
-    def _call_POI_service(self, poi):
+    def call_nav_service(self, next_poi):
         """To initialize and call the go_to_poi service
         """
         rospy.wait_for_service('go_to_poi_service')
         try:
             go_to_poi = rospy.ServiceProxy('go_to_poi_service', GoToPOI)
-            result = go_to_poi(poi)
+            result = go_to_poi(next_poi)
 
             if (result.result == 'goal reached'):
-                print(result.result)
                 return True
             else:
                 print(
@@ -43,67 +42,51 @@ class Navigate(smach.State):
         except rospy.ServiceException as e:
             print('Service call failed: {e}'.format(e=e))
 
-    def _call_POI_state(self):
-        rospy.wait_for_service('get_poi_state')
+    def get_table_by_state(self, state):
+        rospy.wait_for_service('get_table_by_state')
         try:
-            poi_state = rospy.ServiceProxy('get_poi_state',  GetPOIState)
-            state = poi_state('needs serving')
-            return state
+            poi_state = rospy.ServiceProxy('get_table_by_state',  GetTableByState)
+            table = poi_state(state)
+            return table
         except rospy.ServiceException as e:
             print('Service call failed: {e}'.format(e=e))
-
-    def get_need_order(self):
-        state = self._call_POI_state()
-        if (state.need_order_no > 0):
-            table_id = state.table_id
-            return table_id
-        else:
-            return 'All order taken'
-
-    def get_table_to_serve(self):
-        state = self._call_POI_state()
-        if (state.need_serving_no > 0):
-            table_id = state.table_id
-            return table_id
-        else:
-            return 'All Served'
 
     def execute(self, userdata):
         # Check what phase the robot is at
         if (userdata.phase_no == 1):
             # this is the code that is executed when in this state
-            rospy.loginfo('Navigating to the next Point of Interest')
             if len(self.poi) == 0:
                 next_poi = self.counter
-                result = self._call_POI_service(next_poi)
+                result = self.call_nav_service(next_poi)
                 if result:
                     userdata.current_poi = next_poi
                     return 'shop_explore_done'
             else:
                 next_poi = self.poi.pop()
-                result = self._call_POI_service(next_poi)
+                result = self.call_nav_service(next_poi)
                 if result:
                     userdata.current_poi = next_poi
                     return 'at_POI'
 
         elif (userdata.phase_no == 2):
-            table = self.get_need_order()
-            if (table == 'All order taken'):
-                return 'take_order_done'
-            else:
-                result = self._call_POI_service(table)
+            table = self.get_table_by_state('require order')
+            if (table.require_order_no > 0):
+                result = self.call_nav_service(table.table_id)
                 if result:
-                    userdata.current_poi = table
+                    userdata.current_poi = table.table_id
                     return 'at_POI'
+            else:
+                return 'take_order_done'
+                
 
         elif (userdata.phase_no == 3):
             if (userdata.task == 'report order'):
-                result = self._call_POI_service(self.counter)
+                result = self.call_nav_service(self.counter)
                 if result:
                     userdata.current_poi = self.counter
                     return 'at_counter'
             if (userdata.task == 'deliver order'):
-                table = self.get_table_to_serve()
+                table = self.get_table_by_state('need serving')
                 if (table == 'All Served'):
                     return 'all served'
                 else:
@@ -117,15 +100,17 @@ class Navigate(smach.State):
                     userdata.current_poi = self.counter
                     return 'at_default_location'
 
+# POINT OF INTEREST STATE
+
 
 class POI_State(smach.State):
-    def __init__(self, poi):
+    def __init__(self):
         # from here we define the possible outcomes of the state.
         super().__init__(
-            outcomes=['saved', 'updated'], output_keys=['current_poi'], input_keys=['table_object_state', 'table_people_state', 'current_poi', 'phase_no'])
+            outcomes=['saved', 'updated'], output_keys=['current_poi'], input_keys=['no_of_object', 'no_of_people', 'current_poi', 'phase_no'])
 
-    def _call_POI_State_service(self, task, set_state_request=SetPOIStateRequest(), update_state_request=UpdatePOIStateRequest()):
-        """To initialize and call the go_to_poi service
+    def call_poi_state_service(self, task, set_state_request=SetPOIStateRequest(), update_state_request=UpdatePOIStateRequest()):
+        """To initialize and call the poi state service
         """
         if (task == 'set_state'):
             rospy.wait_for_service('set_poi_state')
@@ -153,18 +138,10 @@ class POI_State(smach.State):
         if (userdata.phase_no == 1):
             set_state_request = SetPOIStateRequest()
             set_state_request.table_id = userdata.current_poi
-            set_state_request.no_of_people = userdata.table_people_state
-            set_state_request.no_of_object = userdata.table_object_state
-            if(userdata.table_people_state > 0 and userdata.table_object_state == 0):
-                set_state_request.table_state = 'needs serving'
-            if(userdata.table_people_state > 0 and userdata.table_object_state > 0):
-                set_state_request.table_state = 'already served'
-            if(userdata.table_people_state == 0 and userdata.table_object_state > 0):
-                set_state_request.table_state = 'need cleaning'
-            if(userdata.table_people_state == 0 and userdata.table_object_state == 0):
-                # the table is ready to accept new customers
-                set_state_request.table_state = 'ready'
-            result = self._call_POI_State_service(
+            set_state_request.no_of_people = userdata.no_of_people
+            set_state_request.no_of_object = userdata.no_of_object
+
+            result = self.call_poi_state_service(
                 'set_state', set_state_request=set_state_request)
             if (result):
                 return 'saved'
@@ -172,10 +149,10 @@ class POI_State(smach.State):
         elif(userdata.phase_no == 2):
             update_state_request = UpdatePOIStateRequest()
             update_state_request.table_id = userdata.current_poi
-            update_state_request.updated_states = ['needs serving']
-            update_state_request.needs_serving = False
+            update_state_request.updated_states = ['require order']
+            update_state_request.require_order = False
 
-            result = self._call_POI_State_service(
+            result = self.call_poi_state_service(
                 'update_state', update_state_request=update_state_request)
             if (result):
                 return 'updated'

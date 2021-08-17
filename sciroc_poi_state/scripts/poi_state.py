@@ -4,7 +4,6 @@ import rospy
 from sciroc_poi_state.srv import SetPOIState, UpdatePOIState, GetTableByState
 from sciroc_poi_state.srv import SetPOIStateResponse, UpdatePOIStateResponse, GetTableByStateResponse
 
-# Brings in the messages used by the go_to_poi service
 
 POI = {}  # for storing all the table objects
 
