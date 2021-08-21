@@ -89,7 +89,7 @@ class Navigate(smach.State):
                     return 'at_counter'
             if (userdata.task == 'deliver order'):
                 table = self.get_table_by_state('current serving')
-                if (table.current_serving > 0):
+                if (table.current_serving_no > 0):
                     result = self.call_nav_service(table.table_id)
                     if result:
                         userdata.current_poi = table.table_id
@@ -152,8 +152,10 @@ class POI_State(smach.State):
         elif(userdata.phase_no == 2):
             update_state_request = UpdatePOIStateRequest()
             update_state_request.table_id = userdata.current_poi
-            update_state_request.updated_states = ['require order']
+            update_state_request.updated_states = [
+                'require order', 'required drinks']
             update_state_request.require_order = False
+            update_state_request.required_drinks = userdata.order_list
 
             result = self.call_poi_state_service(
                 'update_state', update_state_request=update_state_request)
@@ -205,39 +207,50 @@ class HRI(smach.State):
             if userdata.current_poi == 'counter':
                 hri_goal.task = 'announce'
                 result = self.call_hri_action(hri_goal)
-                if result == 'announced':
+                if result.status == 'announced':
                     return 'announced'
             else:
                 hri_goal.task = 'greet'
                 result = self.call_hri_action(hri_goal)
-                if result == 'greeted':
+                if result.status == 'greeted':
                     return 'greeted'
 
         elif (userdata.phase_no == 2):
             hri_goal.task = 'take_order'
             result = self.call_hri_action(hri_goal)
-            if result == 'order taken':
+            if result.status == 'order taken':
+                userdata.order_list = result.required_drinks
                 return 'order_taken'
 
         elif (userdata.phase_no == 3):
             if (userdata.task == 'report order'):
                 hri_goal.task = 'report order'
                 result = self.call_hri_action(hri_goal)
-                if (result == 'order_reported'):
+                if (result.status == 'order_reported'):
                     userdata.current_task = 'check object'
                     return 'order_reported'
             if (userdata.task == 'take item'):
                 hri_goal.task = 'take item'
                 result = self.call_hri_action(hri_goal)
-                if (result == 'item taken'):
+                if (result.status == 'item taken'):
                     userdata.current_task = 'deliver order'
                     return 'object_taken'
-            if (userdata.task == 'deliver drink'):
-                hri_goal.task = 'deliver drink'
+            if (userdata.task == 'report missing'):
+                hri_goal.task = 'report missing'
+                hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
-                if (result == 'item delivered'):
-                    userdata.current_task == 'to default location'
-                    return 'object_delivered'
+                if (result.result == 'reported'):
+                    userdata.task = 'check object'
+                    return 'reported missing'
+
+            if (userdata.task == 'report wrong'):
+                hri_goal.task = 'report wrong'
+                hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                result = self.call_hri_action(hri_goal)
+                if (result.result == 'reported'):
+                    userdata.task = 'check object'
+                    return 'reported wrong'
+
 
 # PEOPLE PERCEPTION
 
@@ -248,7 +261,7 @@ class PeoplePerception(smach.State):
         super().__init__(
             outcomes=[], output_keys=['no_of_people'], input_keys=['phase_no'])
 
-    def call_hri_action(self, goal_req):
+    def call_people_percept(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
         client = actionlib.SimpleActionClient(
             'people_percept', PeoplePerceptionAction)
@@ -280,7 +293,7 @@ class PeoplePerception(smach.State):
         people_percept_goal = PeoplePerceptionAction()
         if (userdata.phase_no == 1):
             people_percept_goal.mode = 'detect'
-            result = self.call_hri_action(people_percept_goal)
+            result = self.call_people_percept(people_percept_goal)
             if result == 'detected':
                 userdata.no_of_people = result.no_of_people
                 if(result.no_of_people > 0):
@@ -303,7 +316,7 @@ class ObjectDetection(smach.State):
         super().__init__(
             outcomes=[], output_keys=['no_of_object'], input_keys=['phase_no'])
 
-    def call_hri_action(self, goal_req):
+    def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
         client = actionlib.SimpleActionClient(
             'object_detect', ObjectPerceptionAction)
@@ -335,7 +348,7 @@ class ObjectDetection(smach.State):
         object_detect_goal = ObjectDetectionAction()
         if (userdata.phase_no == 1):
             object_detect_goal.mode = 'detect'
-            result = self.call_hri_action(object_detect_goal)
+            result = self.call_object_detect(object_detect_goal)
             if result == 'detected':
                 userdata.no_of_object = result.no_of_object
                 return 'object_detect_done'
@@ -344,11 +357,23 @@ class ObjectDetection(smach.State):
             pass
 
         elif(userdata.phase_no == 3):
-            pass
+            if (userdata.task == 'check order'):
+                table = self.get_table_by_state('current serving')
+                object_detect_goal.mode = 'check'
+                object_detect_goal.required_drinks = table.required_drinks
+                result = self.call_object_detect(object_detect_goal)
+                if (result.result == 'correct'):
+                    userdata.task = 'take item'
+                    return 'take item'
+                if (result.result == 'wrong'):
+                    userdata.task = 'report wrong'
+                    return 'wrong order'
+                if (result.result == 'missing'):
+                    userdata.task = 'report missing'
+                    return 'missing order'
 
 
 # Setting up the request callback for the Save POI State service
-
 
 if __name__ == '__main__':
     rospy.init_node('sciroc_state_machine')

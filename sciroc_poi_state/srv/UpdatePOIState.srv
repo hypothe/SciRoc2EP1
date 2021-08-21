@@ -1,4 +1,5 @@
 string table_id
+string task
 string[] updated_states
 uint8 no_of_people 
 uint8 no_of_object

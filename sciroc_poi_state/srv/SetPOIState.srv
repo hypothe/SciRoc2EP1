@@ -1,5 +1,0 @@
-string table_id
-uint8 no_of_people 
-uint8 no_of_object
----
-string result 

@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
 import rospy
-from sciroc_poi_state.srv import SetPOIState, UpdatePOIState, GetTableByState
-from sciroc_poi_state.srv import SetPOIStateResponse, UpdatePOIStateResponse, GetTableByStateResponse
+from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
+from sciroc_poi_state.srv import UpdatePOIStateResponse, GetTableByStateResponse
 
 
 POI = {}  # for storing all the table objects
 
 table_states = {'require order': [], 'need serving': [],
-                'already served': [], 'need cleaning': [], 'ready': [], 'current serving':[]}
+                'already served': [], 'need cleaning': [], 'ready': [], 'current serving': []}
 
 
 class Table:
@@ -72,30 +72,23 @@ class Table:
         return True
 
 
-def set_poi_state(req):
-    global POI
-    table_id = req.table_id
-    no_of_people = req.no_of_people
-    no_of_object = req.no_of_object
-
-    POI[table_id] = Table(
-        table_id=table_id, no_of_people=no_of_people, no_of_object=no_of_object)
-    return SetPOIStateResponse('saved')
-
-
 def update_poi_state(req):
     global POI
-    table_id = req.table_id
-    result = POI[table_id].update_state(req)
-    if result:
-        response = 'updated'
-    return UpdatePOIStateResponse(response)
+    if (req.task == 'set'):
+        POI[req.table_id] = Table(
+            table_id=req.table_id, no_of_people=req.no_of_people, no_of_object=req.no_of_object)
+        return UpdatePOIStateResponse('saved')
+    elif (req.task == 'update'):
+        result = POI[req.table_id].update_state(req)
+        if result:
+            response = 'updated'
+        return UpdatePOIStateResponse(response)
 
 
 def update_table_state_data():
     global table_states, POI
     table_states = {'require order': [], 'need serving': [],
-                'already served': [], 'need cleaning': [], 'ready': [], 'current serving':[]}
+                    'already served': [], 'need cleaning': [], 'ready': [], 'current serving': []}
     for table_id in POI:
         table_states[POI[table_id].table_state].append(table_id)
         if (POI[table_id].require_order):
@@ -105,7 +98,7 @@ def update_table_state_data():
 
 
 def generate_table_response(req_mes):
-    global table_states, POI 
+    global table_states, POI
     table_response = GetTableByStateResponse()
     table_ids = table_states[req_mes.table_state]
 
@@ -124,14 +117,16 @@ def generate_table_response(req_mes):
         table_response.need_cleaning_no = len(table_states['need cleaning'])
         table_response.require_order_no = len(table_states['require order'])
         table_response.already_served_no = len(table_states['already served'])
-        table_response.current_serving_no = len(table_states['current serving'])
+        table_response.current_serving_no = len(
+            table_states['current serving'])
 
     else:
         table_response.need_serving_no = len(table_states['need serving'])
         table_response.need_cleaning_no = len(table_states['need cleaning'])
         table_response.require_order_no = len(table_states['require order'])
         table_response.already_served_no = len(table_states['already served'])
-        table_response.current_serving_no = len(table_states['current serving'])
+        table_response.current_serving_no = len(
+            table_states['current serving'])
 
     return table_response
 
@@ -145,9 +140,8 @@ def get_table_by_state(req):
 
 def main():
     rospy.init_node('POI_state')
-    s1 = rospy.Service('set_poi_state', SetPOIState, set_poi_state)
-    s2 = rospy.Service('update_poi_state', UpdatePOIState, update_poi_state)
-    s3 = rospy.Service('get_table_by_state',
+    s1 = rospy.Service('update_poi_state', UpdatePOIState, update_poi_state)
+    s2 = rospy.Service('get_table_by_state',
                        GetTableByState, get_table_by_state)
 
     rospy.spin()
