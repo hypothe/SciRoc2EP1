@@ -11,77 +11,107 @@ if __name__ == '__main__':
            'table3', 'table4', 'table5', 'table6']
 
     # Create a SMACH state machine
-    Trial = smach.StateMachine(outcomes=['finished', 'failed'])
+    Trial = smach.StateMachine(outcomes=['trial_finished'])
 
     with Trial:
 
         Phase1 = smach.StateMachine(
-            outcomes=['finished', 'failed'])
+            outcomes=['phase1_finished'])
         Phase1.userdata.phase_value = 1
 
         # Open the container
         with Phase1:
 
             # Add states to the container
-            smach.StateMachine.add('NAVIGATION', Navigate(
-                poi), transitions={'shop_explore_done': 'HRI', 'at_POI': 'PEOPLE_PERCEPTION'},
-                remapping={'phase_no': 'phase_value'})
-
-            smach.StateMachine.add('PEOPLE_PERCEPTION',
-                                   people_percept_state,
+            smach.StateMachine.add('NAVIGATE', Navigate(poi),
                                    transitions={
-                                       'people_present': 'HRI', 'people_not_precent': 'OBJECT_PERCEPTION'})
+                                       'shop_explore_done': 'HRI(Speak)', 'at_POI': 'DETECT_PEOPLE'},
+                                   remapping={})
 
-            smach.StateMachine.add('OBJECT_PERCEPTION',
-                                   object_percept_state,
+            smach.StateMachine.add('DETECT_PEOPLE',
+                                   PeoplePerception(),
+                                   transitions={
+                                       'people_present': 'HRI(Speak)', 'people_not_precent': 'DETECT_OBJECT'},
+                                   remapping={})
+
+            smach.StateMachine.add('DETECT_OBJECT',
+                                   ObjectDetection(),
                                    transitions={
                                        'object_detect_done': 'SAVE_POI_STATE'},
-                                   remapping={'no_of_object': 'table_object_state', 'phase_no': 'phase_value'})
+                                   remapping={})
 
-            smach.StateMachine.add('HRI', hri_state,
-                                   transitions={'greeted': 'OBJECT_PERCEPTION', 'announced': 'finished'}, remapping={'phase_no': 'phase_value'})
+            smach.StateMachine.add('HRI(Speak)',
+                                   HRI(),
+                                   transitions={
+                                       'greeted': 'DETECT_OBJECT', 'announced': 'phase1_finished'},
+                                   remapping={})
 
             smach.StateMachine.add('SAVE_POI_STATE',
-                                   poi_state_state,
-                                   transitions={'saved': 'NAVIGATION'},
-                                   remapping={'phase_no': 'phase_value'})
+                                   POI_State(),
+                                   transitions={'saved': 'NAVIGATE'},
+                                   remapping={})
 
         smach.StateMachine.add('PHASE_1', Phase1,
-                               transitions={'finished': 'PHASE_2'})
+                               transitions={'phase1_finished': 'PHASE_2'})
 
         Phase2 = smach.StateMachine(
-            outcomes=['finished', 'failed'], output_keys=['phase_value'])
+            outcomes=['phase2_finished', 'at_default_location'])
         Phase2.userdata.phase_value = 2
 
         # Open the container
         with Phase2:
-            smach.StateMachine.add('NAVIGATION', Navigate(
-                poi), {'take_order_done': 'finished', 'at_POI': 'TAKE_ORDER'},
-                remapping={'phase_no': 'phase_value'})
+            smach.StateMachine.add('NAVIGATE',
+                                   Navigate(poi),
+                                   transitions={
+                                       'at_require_order_table': 'HRI(TakeOrder)', 'at_default_location': 'at_default_location'},
+                                   remapping={})
 
-            smach.StateMachine.add('TAKE_ORDER', hri_state,
-                                   transitions={'order_taken': 'NAVIGATION'})
+            smach.StateMachine.add('HRI(TakeOrder)',
+                                   HRI(),
+                                   transitions={
+                                       'order_taken': 'UPDATE_POI_STATE'},
+                                   remapping={})
 
-            smach.StateMachine.add('UPDATE_POI_STATE', poi_state_state,
-                                   transitions={'updated': 'NAVIGATION'})
+            smach.StateMachine.add('UPDATE_POI_STATE',
+                                   POI_State(),
+                                   transitions={'updated': 'phase2_finished'},
+                                   remapping={})
+
+        smach.StateMachine.add('PHASE_2', Phase2,
+                               transitions={'phase2_finished': 'PHASE_3', 'at_default_location': 'trial_finished'})
 
         Phase3 = smach.StateMachine(
-            outcomes=['finished', 'failed'], output_keys=['phase_value', 'task'])
+            outcomes=['phase3_finished'])
         Phase3.userdata.phase_value = 3
         Phase3.userdata.task = 'report order'
 
         # Open the container
         with Phase3:
-            smach.StateMachine.add('NAVIGATION', Navigate(
-                poi), {'at_counter': 'HRI', 'at_POI': 'HRI', 'at_default_location': 'finished'},
-                remapping={'phase_no': 'phase_value', 'current_task': 'task'})
-            smach.StateMachine.add('HRI', hri_state,
-                                   transitions={'order_reported': 'OBJECT_PERCEPTION', 'object_taken': 'NAVIGATION', 'object_delivered': 'NAVIGATION'})
-            smach.StateMachine.add('OBJECT_PERCEPTION',
-                                   object_percept_state,
+            smach.StateMachine.add('NAVIGATION',
+                                   Navigate(poi),
                                    transitions={
-                                       'missing_object': 'HRI', 'object_ok': 'HRI'},
-                                   remapping={'no_of_object': 'table_object_state', 'phase_no': 'phase_value'})
+                                       'at_counter': 'HRI(Speak)', 'at_current_serving_table': 'HRI(Speak)'},
+                                   remapping={})
+
+            smach.StateMachine.add('HRI(Speak)',
+                                   HRI(),
+                                   transitions={'order_reported': 'CHECK_OBJECT', 'missing_reported': 'CHECK_OBJECT',
+                                                'wrong_reported': 'CHECK_OBJECT', 'object_taken': 'NAVIGATE', 'order_delivered': 'UPDATE_POI_STATE'},
+                                   remapping={})
+
+            smach.StateMachine.add('CHECK_OBJECT',
+                                   ObjectDetection(),
+                                   transitions={
+                                       'correct_order': 'HRI(Speak)', 'wrong_order': 'HRI(Speak)', 'missing_order': 'HRI(Speak)'},
+                                   remapping={})
+
+            smach.StateMachine.add('UPDATE_POI_STATE',
+                                   POI_State(),
+                                   transitions={'updated': 'phase3_finished'},
+                                   remapping={})
+
+        smach.StateMachine.add('PHASE_3', Phase3,
+                               transitions={'phase3_finished': 'PHASE_2'})
 
     # Execute SMACH plan
     outcome = Trial.execute()
