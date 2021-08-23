@@ -56,7 +56,7 @@ class Navigate(smach.State):
         super().__init__(
             outcomes=['at_POI', 'shop_explore_done', 'at_counter', 'at_require_order_table',
                       'at_current_serving_table', 'at_default_location', 'trail_finished'],
-            output_keys=['current_poi'], input_keys=['phase_no', 'task'])
+            output_keys=['current_poi', 'task'], input_keys=['phase_no', 'task'])
         # This would be changed later, only here for testing reasons
         self.poi = poi[1:]
         self.counter = poi[0]
@@ -151,13 +151,14 @@ class Navigate(smach.State):
                 result = self.call_nav_service(table.table_id)
                 if result:
                     userdata.current_poi = table.table_id
+                    userdata.task = 'announce order arrival'
                     return 'at_current_serving_table'
 
-            if (userdata.task == 'to default location'):
-                result = self.call_nav_service(self.counter)
-                if result:
-                    userdata.current_poi = self.counter
-                    return 'at_default_location'
+            # if (userdata.task == 'to default location'):
+            #     result = self.call_nav_service(self.counter)
+            #     if result:
+            #         userdata.current_poi = self.counter
+            #         return 'at_default_location'
 
 
 ###+++++++++++++++++++ POINT OF INTEREST STATE (POI STATE) +++++++++++++++++++++###
