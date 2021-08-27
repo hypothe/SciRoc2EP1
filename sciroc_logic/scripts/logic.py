@@ -19,7 +19,7 @@ from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # people perception package
-from people_perception.msg import PeopleCounterAction, PeopleCounterGoal
+from people_perception.msg import PeopleCounterAction, PeopleCounterGoal,PeopleCounterResult
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal,HRIResult
@@ -490,23 +490,27 @@ class PeoplePerception(smach.State):
         """
         # Creates the SimpleActionClient, passing the type of the action
 
-        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
+        #client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
 
       
 
         # Waits until the action server has started up and started
         # listening for goals.
-        client.wait_for_server()
+        #client.wait_for_server()
 
         # Sends the goal to the action server.
 
-        goal = PeopleCounterGoal()
-        client.send_goal(goal)
+       # goal = PeopleCounterGoal()
+        #client.send_goal(goal)
         # Waits for the server to finish performing the action.
-        client.wait_for_result()
+       # client.wait_for_result()
 
         # return the result of executing the action
-        return client.get_result()
+       # return client.get_result()
+        _res=PeopleCounterResult()
+        _res.n_people =4
+        return _res
+
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
