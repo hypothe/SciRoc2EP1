@@ -184,7 +184,7 @@ def get_table_object(req):
 def main():
     rospy.init_node("POI_state")
     s1 = rospy.Service("update_poi_state", UpdatePOIState, update_poi_state)
-    s2 = rospy.Service("get_table_by_state", GetTableObject, get_table_object)
+    s2 = rospy.Service("get_table_object", GetTableObject, get_table_object)
 
     rospy.spin()
 

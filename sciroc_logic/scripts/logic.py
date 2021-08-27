@@ -15,14 +15,36 @@ from actionlib_msgs.msg._GoalStatus import GoalStatus
 from sciroc_navigation.srv import GoToPOI
 
 # message for updating and the getting the state of the POI (Point of Interest)
-from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
-from sciroc_poi_state.srv import UpdatePOIStateRequest
+from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
+from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # people perception package
 from people_perception.msg import PeopleCounterAction, PeopleCounterGoal
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal
+
+
+def get_table_by_state(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 0
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
+
+
+def get_table_by_id(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 1
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
 
 
 ##########-------------- CREATING THE STATE ----------------------##########################
@@ -51,8 +73,7 @@ class Navigate(smach.State):
     ---
     call_nav_service(next_poi)
         for sending a request to the go to poi service to navigate the robot to the next_poi arg
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
@@ -103,25 +124,6 @@ class Navigate(smach.State):
         except rospy.ServiceException as e:
             print("Service call failed: {e}".format(e=e))
 
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
-
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state.
 
@@ -147,7 +149,9 @@ class Navigate(smach.State):
                     return "at_POI"
 
         elif userdata.phase_no == 2:
-            table = self.get_table_by_state("require order")
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "require order"
+            table = get_table_by_state(table_req)
             if len(table.require_order_list) > 0:
                 result = self.call_nav_service(table.table_id)
                 if result:
@@ -164,7 +168,9 @@ class Navigate(smach.State):
                     userdata.current_poi = self.counter
                     return "at_counter"
             if userdata.task == "deliver order":
-                table = self.get_table_by_state("current serving")
+                table_req = GetTableObjectRequest()
+                table_req.table_state = "current serving"
+                table = get_table_by_state(table_req)
                 result = self.call_nav_service(table.table_id)
                 if result:
                     userdata.current_poi = table.table_id
@@ -305,8 +311,7 @@ class HRI(smach.State):
     ---
     call_hri_action(goal_req)
         for send a goal request to the hri action server
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
@@ -358,25 +363,6 @@ class HRI(smach.State):
 
         # return the result of executing the action
         return client.get_result()
-
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
@@ -469,8 +455,7 @@ class PeoplePerception(smach.State):
     ---
     call_people_percept()
         for sending a goal request to the people perception action server
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
@@ -505,23 +490,6 @@ class PeoplePerception(smach.State):
 
         # return the result of executing the action
         return client.get_result()
-
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-        Args:
-            state (str): The requested state
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
@@ -569,8 +537,7 @@ class ObjectDetection(smach.State):
     ---
     call_nav_service(next_poi)
         for sending a request to the go to poi service to navigate the robot to the next_poi arg
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
@@ -628,25 +595,6 @@ class ObjectDetection(smach.State):
                 missing_drinks.append(drink)
         return missing_drinks
 
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
-
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
 
@@ -669,7 +617,9 @@ class ObjectDetection(smach.State):
 
         elif userdata.phase_no == 3:
             if userdata.task == "check order":
-                table = self.get_table_by_state("current serving")
+                table_req = GetTableObjectRequest()
+                table_req.table_state = "current serving"
+                table = get_table_by_state(table_req)
                 object_detect_goal.mode = 2  # Comparison
                 object_detect_goal.expected_tags = table.required_drinks
                 result = self.call_object_detect(object_detect_goal)
