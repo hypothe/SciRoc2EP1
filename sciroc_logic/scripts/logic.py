@@ -339,6 +339,9 @@ class HRI(smach.State):
             ],
         )
 
+    def get_announce_text(self):
+        pass
+
     def call_hri_action(self, goal_req):
         """This method sends a goal request to the hri action server
 
@@ -378,7 +381,7 @@ class HRI(smach.State):
         if userdata.phase_no == 1:
             if userdata.current_poi == "counter":
                 hri_goal.mode = 0  # Announce text
-                table = self.get_table_by_state("need serving")
+                hri_goal.text = self.get_announce_text()
                 result = self.call_hri_action(hri_goal)
                 if result.result == "announced":
                     return "announced"
@@ -389,55 +392,59 @@ class HRI(smach.State):
                     return "greeted"
 
         elif userdata.phase_no == 2:
-            hri_goal.mode = "take order"
+            hri_goal.mode = 1  # Take Order
             result = self.call_hri_action(hri_goal)
-            if result.result == "order taken":
+            if result.result:
                 userdata.order_list = result.required_drinks
                 return "order_taken"
 
         elif userdata.phase_no == 3:
             if userdata.task == "report order":
-                hri_goal.mode = "report order"
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
                 result = self.call_hri_action(hri_goal)
-                if result.result == "order reported":
+                if result.result:
                     userdata.task = "check object"
                     return "order_reported"
 
             elif userdata.task == "report missing":
-                hri_goal.mode = "report missing"
-                hri_goal.missing_drinks.extend(userdata.missing_drinks)
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "missing reported":
+                if result.result:
                     userdata.task = "check object"
                     return "missing_reported"
 
             elif userdata.task == "report wrong":
-                hri_goal.mode = "report wrong"
-                hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "wrong reported":
+                if result.result:
                     userdata.task = "check object"
                     return "wrong_reported"
 
             elif userdata.task == "report wrong and missing":
-                hri_goal.mode = "report wrong and missing"
-                hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
-                hri_goal.missing_drinks.extend(userdata.missing_drinks)
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                # hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "wrong and missing reported":
+                if result.result:
                     userdata.task = "check object"
                     return "wrong_and_missing_order_reported"
 
             elif userdata.task == "take item":
-                hri_goal.mode = "take item"
+                hri_goal.mode = 3  # Take Item
                 result = self.call_hri_action(hri_goal)
-                if result.result == "item taken":
+                if result.result:
                     userdata.task = "deliver order"
                     return "object_taken"
             elif userdata.task == "announce order arrival":
-                hri_goal.mode = "announce order arrival"
+                hri_goal.mode = 4  # Drop Item
                 result = self.call_hri_action(hri_goal)
-                if result.result == "order arrival announced":
+                if result.result:
                     return "order_delivered"
 
 
