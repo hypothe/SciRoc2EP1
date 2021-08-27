@@ -145,6 +145,7 @@ def generate_table_response(req_mes):
         table_ids = table_states[req_mes.table_state]
         table = POI[table_ids[0]]
     elif req_mes.mode == 1:
+        table_ids = []
         table = POI[req_mes.table_id]
 
     if len(table_ids) > 0 or req_mes.mode == 1:
