@@ -84,7 +84,7 @@ class Navigate(smach.State):
             poi ([list]): list containing all the point of interest from the poi parameter server
 
         """
-        super().__init__(
+        smach.State.__init__(
             outcomes=[
                 "at_POI",
                 "shop_explore_done",
@@ -204,7 +204,7 @@ class POI_State(smach.State):
     """
 
     def __init__(self):
-        super().__init__(
+        smach.State.__init__(
             outcomes=["saved", "updated"],
             input_keys=[
                 "phase_no",
@@ -317,7 +317,7 @@ class HRI(smach.State):
     """
 
     def __init__(self):
-        super().__init__(
+        smach.State.__init__(
             outcomes=[
                 "announced",
                 "greeted",
@@ -469,7 +469,7 @@ class PeoplePerception(smach.State):
 
     def __init__(self):
         # from here we define the possible outcomes of the state.
-        super().__init__(
+        smach.State.__init__(
             outcomes=["people_present", "people_not_present"],
             output_keys=["no_of_people"],
             input_keys=["phase_no"],
@@ -551,7 +551,7 @@ class ObjectDetection(smach.State):
 
     def __init__(self):
         # from here we define the possible outcomes of the state.
-        super().__init__(
+        smach.State.__init__(
             outcomes=[
                 "object_detect_done",
                 "correct_order",
