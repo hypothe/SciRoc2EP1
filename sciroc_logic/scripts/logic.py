@@ -18,6 +18,12 @@ from sciroc_navigation.srv import GoToPOI
 from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
 from sciroc_poi_state.srv import UpdatePOIStateRequest
 
+# people perception package
+from people_perception.msg import PeopleCounterAction, PeopleCounterGoal
+
+# human robot interaction package
+from sciroc_hri.msg import HRIAction, HRIGoal
+
 
 ##########-------------- CREATING THE STATE ----------------------##########################
 
@@ -65,7 +71,7 @@ class Navigate(smach.State):
                 "at_require_order_table",
                 "at_current_serving_table",
                 "at_default_location",
-                "trail_finished",
+                "trial_finished",
             ],
             output_keys=["current_poi", "task"],
             input_keys=["phase_no", "task"],
@@ -142,7 +148,7 @@ class Navigate(smach.State):
 
         elif userdata.phase_no == 2:
             table = self.get_table_by_state("require order")
-            if table.require_order_no > 0:
+            if len(table.require_order_list) > 0:
                 result = self.call_nav_service(table.table_id)
                 if result:
                     userdata.current_poi = table.table_id
@@ -316,6 +322,7 @@ class HRI(smach.State):
                 "wrong_reported",
                 "object_taken",
                 "order_delivered",
+                "wrong_and_missing_order_reported",
             ],
             output_keys=["task"],
             input_keys=[
@@ -381,21 +388,22 @@ class HRI(smach.State):
             [string]: This is the outcome of this state
         """
 
-        hri_goal = HRIAction()
+        hri_goal = HRIGoal()
         if userdata.phase_no == 1:
             if userdata.current_poi == "counter":
-                hri_goal.task = "announce state"
+                hri_goal.mode = 0  # Announce text
+                table = self.get_table_by_state("need serving")
                 result = self.call_hri_action(hri_goal)
                 if result.result == "announced":
                     return "announced"
             else:
-                hri_goal.task = "greet"
+                hri_goal.mode = 2  # Greet Customer
                 result = self.call_hri_action(hri_goal)
-                if result.result == "greeted":
+                if result.result:
                     return "greeted"
 
         elif userdata.phase_no == 2:
-            hri_goal.task = "take order"
+            hri_goal.mode = "take order"
             result = self.call_hri_action(hri_goal)
             if result.result == "order taken":
                 userdata.order_list = result.required_drinks
@@ -403,14 +411,14 @@ class HRI(smach.State):
 
         elif userdata.phase_no == 3:
             if userdata.task == "report order":
-                hri_goal.task = "report order"
+                hri_goal.mode = "report order"
                 result = self.call_hri_action(hri_goal)
                 if result.result == "order reported":
                     userdata.task = "check object"
                     return "order_reported"
 
             elif userdata.task == "report missing":
-                hri_goal.task = "report missing"
+                hri_goal.mode = "report missing"
                 hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
                 if result.result == "missing reported":
@@ -418,21 +426,30 @@ class HRI(smach.State):
                     return "missing_reported"
 
             elif userdata.task == "report wrong":
-                hri_goal.task = "report wrong"
+                hri_goal.mode = "report wrong"
                 hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
                 result = self.call_hri_action(hri_goal)
                 if result.result == "wrong reported":
                     userdata.task = "check object"
                     return "wrong_reported"
 
+            elif userdata.task == "report wrong and missing":
+                hri_goal.mode = "report wrong and missing"
+                hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                hri_goal.missing_drinks.extend(userdata.missing_drinks)
+                result = self.call_hri_action(hri_goal)
+                if result.result == "wrong and missing reported":
+                    userdata.task = "check object"
+                    return "wrong_and_missing_order_reported"
+
             elif userdata.task == "take item":
-                hri_goal.task = "take item"
+                hri_goal.mode = "take item"
                 result = self.call_hri_action(hri_goal)
                 if result.result == "item taken":
                     userdata.task = "deliver order"
                     return "object_taken"
             elif userdata.task == "announce order arrival":
-                hri_goal.task = "announce order arrival"
+                hri_goal.mode = "announce order arrival"
                 result = self.call_hri_action(hri_goal)
                 if result.result == "order arrival announced":
                     return "order_delivered"
@@ -445,14 +462,12 @@ class PeoplePerception(smach.State):
     """This is the class for the object that performs the required actions
     when the robot is in the people perception state, it helps the robot
     detect the presence and absence of people at a point of interest (poi)
-
     Args:
         smach ([class]): This is the superclass the PeoplePerception class inherits from,
         this gives it all the required attributes and methods to instantiate the state class
-
     Methods
     ---
-    call_people_percept(goal_req)
+    call_people_percept()
         for sending a goal request to the people perception action server
     get_table_by_state(state)
         for getting the table object of the the table that has thesame state as the state arg
@@ -468,25 +483,23 @@ class PeoplePerception(smach.State):
             input_keys=["phase_no"],
         )
 
-    def call_people_percept(self, goal_req):
+    def call_people_percept(self):
         """This method sends a goal request to the people_percept action server
-
-        Args:
-            goal_req (str): the goal request message
 
         Returns:
             [object]: the result returned from the people percept action server
         """
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("people_percept", PeoplePerceptionAction)
+        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
         client.wait_for_server()
 
         # Sends the goal to the action server.
-        client.send_goal(goal_req)
 
+        goal = PeopleCounterGoal()
+        client.send_goal(goal)
         # Waits for the server to finish performing the action.
         client.wait_for_result()
 
@@ -496,10 +509,8 @@ class PeoplePerception(smach.State):
     def get_table_by_state(self, state):
         """This method gets the object of the point of interest that has thesame
         state as the requested state
-
         Args:
             state (str): The requested state
-
         Returns:
             [object]: an object of a point of interest with thesame state as the
             requested state
@@ -514,24 +525,20 @@ class PeoplePerception(smach.State):
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
-
         Args:
             userdata (struct): This is a struct containing input and/or output data from/to the state
-
         Returns:
             [string]: This is the outcome of this state
         """
 
-        people_percept_goal = PeoplePerceptionAction()
         if userdata.phase_no == 1:
-            people_percept_goal.mode = "detect"
-            result = self.call_people_percept(people_percept_goal)
-            if result.result == "detected":
-                userdata.no_of_people = result.no_of_people
-                if result.no_of_people > 0:
-                    return "people_present"
-                else:
-                    return "people_not_present"
+            result = self.call_people_percept()
+            userdata.no_of_people = result.n_people
+            if result.n_people > 0:
+                return "people_present"
+            else:
+                return "people_not_present"
+
         # People perception is not required in both phase 1 & 2
         elif userdata.phase_no == 2:
             pass
@@ -576,6 +583,7 @@ class ObjectDetection(smach.State):
                 "correct_order",
                 "wrong_order",
                 "missing_order",
+                "wrong_and_missing_order",
             ],
             output_keys=["no_of_object", "task", "wrong_drinks", "missing_drinks"],
             input_keys=["phase_no", "task"],
@@ -606,6 +614,20 @@ class ObjectDetection(smach.State):
         # return the result of executing the action
         return client.get_result()
 
+    def check_wrong_drinks(self, expected_tags, found_tags):
+        wrong_drinks = []
+        for drink in found_tags:
+            if drink not in expected_tags:
+                wrong_drinks.append(drink)
+        return wrong_drinks
+
+    def check_missing_drinks(self, expected_tags, found_tags):
+        missing_drinks = []
+        for drink in expected_tags:
+            if drink not in found_tags:
+                missing_drinks.append(drink)
+        return missing_drinks
+
     def get_table_by_state(self, state):
         """This method gets the object of the point of interest that has thesame
         state as the requested state
@@ -634,13 +656,12 @@ class ObjectDetection(smach.State):
         Returns:
             [string]: This is the outcome of this state
         """
-        object_detect_goal = ObjectDetectionAction()
+        object_detect_goal = ObjectDetectionGoal()
         if userdata.phase_no == 1:
-            object_detect_goal.mode = "detect"
+            object_detect_goal.mode = 0  # Enumeration
             result = self.call_object_detect(object_detect_goal)
-            if result.result == "detected":
-                userdata.no_of_object = result.no_of_object
-                return "object_detect_done"
+            userdata.no_of_object = result.n_found_tags
+            return "object_detect_done"
 
         # Phase 2 does not require object detection
         elif userdata.phase_no == 2:
@@ -649,20 +670,34 @@ class ObjectDetection(smach.State):
         elif userdata.phase_no == 3:
             if userdata.task == "check order":
                 table = self.get_table_by_state("current serving")
-                object_detect_goal.mode = "check"
-                object_detect_goal.required_drinks = table.required_drinks
+                object_detect_goal.mode = 2  # Comparison
+                object_detect_goal.expected_tags = table.required_drinks
                 result = self.call_object_detect(object_detect_goal)
-                if result.result == "correct":
+                if result.match:
                     userdata.task = "take item"
                     return "correct_order"
-                if result.result == "wrong":
-                    userdata.task = "report wrong"
-                    userdata.wrong_drinks = result.wrong_drinks
-                    return "wrong_order"
-                if result.result == "missing":
-                    userdata.task = "report missing"
-                    userdata.missing_drinks = result.missing_drinks
-                    return "missing_order"
+                if result.match == False:
+                    missing_drinks = self.check_missing_drinks(
+                        expected_tags=table.required_drinks,
+                        found_tags=result.found_tags,
+                    )
+                    wrong_drinks = self.check_wrong_drinks(
+                        expected_tags=table.required_drinks,
+                        found_tags=result.found_tags,
+                    )
+                    if len(missing_drinks) > 0:
+                        userdata.task = "report missing"
+                        userdata.missing_drinks = missing_drinks
+                        return "missing_order"
+                    elif len(wrong_drinks) > 0:
+                        userdata.task = "report wrong"
+                        userdata.wrong_drinks = wrong_drinks
+                        return "wrong_order"
+                    elif len(wrong_drinks) > 0 and len(missing_drinks) > 0:
+                        userdata.task = "report wrong and missing"
+                        userdata.missing_drinks = missing_drinks
+                        userdata.wrong_drinks = wrong_drinks
+                        return "wrong_and_missing_order"
 
 
 if __name__ == "__main__":
@@ -800,6 +835,7 @@ if __name__ == "__main__":
                     "order_reported": "CHECK_OBJECT",
                     "missing_reported": "CHECK_OBJECT",
                     "wrong_reported": "CHECK_OBJECT",
+                    "wrong_and_missing_order_reported": "CHECK_OBJECT",
                     "object_taken": "NAVIGATE",
                     "order_delivered": "UPDATE_POI_STATE",
                 },
@@ -818,6 +854,7 @@ if __name__ == "__main__":
                     "correct_order": "HRI(Speak)",
                     "wrong_order": "HRI(Speak)",
                     "missing_order": "HRI(Speak)",
+                    "wrong_and_missing_order": "HRI(Speak)",
                 },
                 remapping={"phase_no": "phase_value", "task": "task"},
             )
