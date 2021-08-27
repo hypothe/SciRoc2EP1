@@ -1,3 +1,5 @@
+uint8 mode
+string table_id
 string table_state
 ---
 string table_id
@@ -9,8 +11,8 @@ bool require_order
 bool already_served 
 bool current_serving 
 string[] required_drinks
-uint8 need_serving_no
-uint8 need_cleaning_no
-uint8 require_order_no
-uint8 already_served_no 
-uint8 current_serving_no
+string[] need_serving_list
+string[] need_cleaning_list
+string[] require_order_list
+string[] already_served_list
+string[] current_serving_list

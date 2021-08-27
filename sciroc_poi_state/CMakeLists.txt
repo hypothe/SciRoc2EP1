@@ -57,7 +57,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_service_files(
    FILES
    UpdatePOIState.srv
-   GetTableByState.srv
+   GetTableObject.srv
  )
 
 ## Generate actions in the 'action' folder

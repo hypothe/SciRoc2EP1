@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import rospy
-from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
-from sciroc_poi_state.srv import UpdatePOIStateResponse, GetTableByStateResponse
+from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
+from sciroc_poi_state.srv import UpdatePOIStateResponse, GetTableObjectResponse
 
 
 POI = {}  # for storing all the table objects
@@ -139,11 +139,16 @@ def update_table_state_data():
 
 def generate_table_response(req_mes):
     global table_states, POI
-    table_response = GetTableByStateResponse()
-    table_ids = table_states[req_mes.table_state]
+    table_response = GetTableObjectResponse()
 
-    if len(table_ids) > 0:
+    if req_mes.mode == 0:
+        table_ids = table_states[req_mes.table_state]
         table = POI[table_ids[0]]
+    elif req_mes.mode == 1:
+        table_ids = []
+        table = POI[req_mes.table_id]
+
+    if len(table_ids) > 0 or req_mes.mode == 1:
         table_response.table_id = table.table_id
         table_response.no_of_people = table.no_of_people
         table_response.no_of_object = table.no_of_object
@@ -153,24 +158,25 @@ def generate_table_response(req_mes):
         table_response.current_serving = table.current_serving
         table_response.already_served = table.already_served
         table_response.required_drinks = table.required_drinks
-        table_response.need_serving_no = len(table_states["need serving"])
-        table_response.need_cleaning_no = len(table_states["need cleaning"])
-        table_response.require_order_no = len(table_states["require order"])
-        table_response.already_served_no = len(table_states["already served"])
-        table_response.current_serving_no = len(table_states["current serving"])
+        table_response.need_serving_list = table_states["need serving"]
+        table_response.need_cleaning_list = table_states["need cleaning"]
+        table_response.require_order_list = table_states["require order"]
+        table_response.already_served_list = table_states["already served"]
+        table_response.current_serving_list = table_states["current serving"]
 
     else:
-        table_response.need_serving_no = len(table_states["need serving"])
-        table_response.need_cleaning_no = len(table_states["need cleaning"])
-        table_response.require_order_no = len(table_states["require order"])
-        table_response.already_served_no = len(table_states["already served"])
-        table_response.current_serving_no = len(table_states["current serving"])
+        table_response.need_serving_list = table_states["need serving"]
+        table_response.need_cleaning_list = table_states["need cleaning"]
+        table_response.require_order_list = table_states["require order"]
+        table_response.already_served_list = table_states["already served"]
+        table_response.current_serving_list = table_states["current serving"]
 
     return table_response
 
 
-def get_table_by_state(req):
+def get_table_object(req):
     global table_states, POI
+
     update_table_state_data()
     table_response = generate_table_response(req)
     return table_response
@@ -179,7 +185,7 @@ def get_table_by_state(req):
 def main():
     rospy.init_node("POI_state")
     s1 = rospy.Service("update_poi_state", UpdatePOIState, update_poi_state)
-    s2 = rospy.Service("get_table_by_state", GetTableByState, get_table_by_state)
+    s2 = rospy.Service("get_table_object", GetTableObject, get_table_object)
 
     rospy.spin()
 

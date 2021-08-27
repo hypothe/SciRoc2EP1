@@ -15,10 +15,41 @@ from actionlib_msgs.msg._GoalStatus import GoalStatus
 from sciroc_navigation.srv import GoToPOI
 
 # message for updating and the getting the state of the POI (Point of Interest)
-from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
-from sciroc_poi_state.srv import UpdatePOIStateRequest
+from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
+from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
-import people_perception.msg
+# people perception package
+from people_perception.msg import PeopleCounterAction, PeopleCounterGoal
+
+# human robot interaction package
+from sciroc_hri.msg import HRIAction, HRIGoal,HRIResult
+
+from sciroc_objdet.msg import ObjDetInterfaceAction, ObjDetInterfaceGoal, ObjDetInterfaceResult
+
+poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
+
+def get_table_by_state(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 0
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
+
+
+def get_table_by_id(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 1
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
+
+
 ##########-------------- CREATING THE STATE ----------------------##########################
 
 
@@ -45,19 +76,19 @@ class Navigate(smach.State):
     ---
     call_nav_service(next_poi)
         for sending a request to the go to poi service to navigate the robot to the next_poi arg
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
 
-    def __init__(self, poi):
+    def __init__(self):
         """
         Args:
             poi ([list]): list containing all the point of interest from the poi parameter server
 
         """
-        super().__init__(
+        
+        smach.State.__init__(self,
             outcomes=[
                 "at_POI",
                 "shop_explore_done",
@@ -65,7 +96,7 @@ class Navigate(smach.State):
                 "at_require_order_table",
                 "at_current_serving_table",
                 "at_default_location",
-                "trail_finished",
+                "trial_finished",
             ],
             output_keys=["current_poi", "task"],
             input_keys=["phase_no", "task"],
@@ -97,25 +128,6 @@ class Navigate(smach.State):
         except rospy.ServiceException as e:
             print("Service call failed: {e}".format(e=e))
 
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
-
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state.
 
@@ -141,8 +153,10 @@ class Navigate(smach.State):
                     return "at_POI"
 
         elif userdata.phase_no == 2:
-            table = self.get_table_by_state("require order")
-            if table.require_order_no > 0:
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "require order"
+            table = get_table_by_state(table_req)
+            if len(table.require_order_list) > 0:
                 result = self.call_nav_service(table.table_id)
                 if result:
                     userdata.current_poi = table.table_id
@@ -158,7 +172,9 @@ class Navigate(smach.State):
                     userdata.current_poi = self.counter
                     return "at_counter"
             if userdata.task == "deliver order":
-                table = self.get_table_by_state("current serving")
+                table_req = GetTableObjectRequest()
+                table_req.table_state = "current serving"
+                table = get_table_by_state(table_req)
                 result = self.call_nav_service(table.table_id)
                 if result:
                     userdata.current_poi = table.table_id
@@ -192,7 +208,7 @@ class POI_State(smach.State):
     """
 
     def __init__(self):
-        super().__init__(
+        smach.State.__init__(self,
             outcomes=["saved", "updated"],
             input_keys=[
                 "phase_no",
@@ -299,14 +315,13 @@ class HRI(smach.State):
     ---
     call_hri_action(goal_req)
         for send a goal request to the hri action server
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
 
     def __init__(self):
-        super().__init__(
+        smach.State.__init__(self,
             outcomes=[
                 "announced",
                 "greeted",
@@ -316,6 +331,7 @@ class HRI(smach.State):
                 "wrong_reported",
                 "object_taken",
                 "order_delivered",
+                "wrong_and_missing_order_reported",
             ],
             output_keys=["task"],
             input_keys=[
@@ -327,6 +343,9 @@ class HRI(smach.State):
             ],
         )
 
+    def get_announce_text(self):
+        pass
+
     def call_hri_action(self, goal_req):
         """This method sends a goal request to the hri action server
 
@@ -337,39 +356,23 @@ class HRI(smach.State):
             [str]: the result returned from the hri action server
         """
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("hri", HRIAction)
+        #client = actionlib.SimpleActionClient("hri", HRIAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        client.wait_for_server()
+        #client.wait_for_server()
 
         # Sends the goal to the action server.
-        client.send_goal(goal_req)
+        #client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        client.wait_for_result()
+        #client.wait_for_result()
 
         # return the result of executing the action
-        return client.get_result()
-
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
+        #return client.get_result()
+        result=HRIResult()
+        result.result=True
+        result.order_list=["","",""]
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
@@ -381,60 +384,74 @@ class HRI(smach.State):
             [string]: This is the outcome of this state
         """
 
-        hri_goal = HRIAction()
+        hri_goal = HRIGoal()
         if userdata.phase_no == 1:
             if userdata.current_poi == "counter":
-                hri_goal.task = "announce state"
+                hri_goal.mode = 0  # Announce text
+                hri_goal.text = self.get_announce_text()
                 result = self.call_hri_action(hri_goal)
                 if result.result == "announced":
                     return "announced"
             else:
-                hri_goal.task = "greet"
+                hri_goal.mode = 2  # Greet Customer
                 result = self.call_hri_action(hri_goal)
-                if result.result == "greeted":
+                if result.result:
                     return "greeted"
 
         elif userdata.phase_no == 2:
-            hri_goal.task = "take order"
+            hri_goal.mode = 1  # Take Order
             result = self.call_hri_action(hri_goal)
-            if result.result == "order taken":
+            if result.result:
                 userdata.order_list = result.required_drinks
                 return "order_taken"
 
         elif userdata.phase_no == 3:
             if userdata.task == "report order":
-                hri_goal.task = "report order"
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
                 result = self.call_hri_action(hri_goal)
-                if result.result == "order reported":
+                if result.result:
                     userdata.task = "check object"
                     return "order_reported"
 
             elif userdata.task == "report missing":
-                hri_goal.task = "report missing"
-                hri_goal.missing_drinks.extend(userdata.missing_drinks)
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "missing reported":
+                if result.result:
                     userdata.task = "check object"
                     return "missing_reported"
 
             elif userdata.task == "report wrong":
-                hri_goal.task = "report wrong"
-                hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "wrong reported":
+                if result.result:
                     userdata.task = "check object"
                     return "wrong_reported"
 
-            elif userdata.task == "take item":
-                hri_goal.task = "take item"
+            elif userdata.task == "report wrong and missing":
+                hri_goal.mode = 0  # Announce Text
+                hri_goal.text = self.get_announce_text()
+                # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+                # hri_goal.missing_drinks.extend(userdata.missing_drinks)
                 result = self.call_hri_action(hri_goal)
-                if result.result == "item taken":
+                if result.result:
+                    userdata.task = "check object"
+                    return "wrong_and_missing_order_reported"
+
+            elif userdata.task == "take item":
+                hri_goal.mode = 3  # Take Item
+                result = self.call_hri_action(hri_goal)
+                if result.result:
                     userdata.task = "deliver order"
                     return "object_taken"
             elif userdata.task == "announce order arrival":
-                hri_goal.task = "announce order arrival"
+                hri_goal.mode = 4  # Drop Item
                 result = self.call_hri_action(hri_goal)
-                if result.result == "order arrival announced":
+                if result.result:
                     return "order_delivered"
 
 
@@ -445,93 +462,68 @@ class PeoplePerception(smach.State):
     """This is the class for the object that performs the required actions
     when the robot is in the people perception state, it helps the robot
     detect the presence and absence of people at a point of interest (poi)
-
     Args:
         smach ([class]): This is the superclass the PeoplePerception class inherits from,
         this gives it all the required attributes and methods to instantiate the state class
-
     Methods
     ---
-    call_people_percept(goal_req)
+    call_people_percept()
         for sending a goal request to the people perception action server
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
 
     def __init__(self):
         # from here we define the possible outcomes of the state.
-        super().__init__(
+        smach.State.__init__(self,
             outcomes=["people_present", "people_not_present"],
             output_keys=["no_of_people"],
             input_keys=["phase_no"],
         )
 
-    def call_people_percept(self, goal_req):
+    def call_people_percept(self):
         """This method sends a goal request to the people_percept action server
-
-        Args:
-            goal_req (str): the goal request message
 
         Returns:
             [object]: the result returned from the people percept action server
         """
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("people_detection", PeopleCounter)
+
+        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
+
+      
 
         # Waits until the action server has started up and started
         # listening for goals.
         client.wait_for_server()
 
         # Sends the goal to the action server.
-        client.send_goal()
 
+        goal = PeopleCounterGoal()
+        client.send_goal(goal)
         # Waits for the server to finish performing the action.
         client.wait_for_result()
 
         # return the result of executing the action
         return client.get_result()
 
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
-
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
-
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
-
         Args:
             userdata (struct): This is a struct containing input and/or output data from/to the state
-
         Returns:
             [string]: This is the outcome of this state
         """
 
-        people_percept_goal = PeoplePerceptionAction()
         if userdata.phase_no == 1:
-            people_percept_goal.mode = "detect"
-            result = self.call_people_percept(people_percept_goal)
-            if result.result == "detected":
-                userdata.no_of_people = result.no_of_people
-                if result.no_of_people > 0:
-                    return "people_present"
-                else:
-                    return "people_not_present"
+            result = self.call_people_percept()
+            userdata.no_of_people = result.n_people
+            if result.n_people > 0:
+                return "people_present"
+            else:
+                return "people_not_present"
+
         # People perception is not required in both phase 1 & 2
         elif userdata.phase_no == 2:
             pass
@@ -562,20 +554,20 @@ class ObjectDetection(smach.State):
     ---
     call_nav_service(next_poi)
         for sending a request to the go to poi service to navigate the robot to the next_poi arg
-    get_table_by_state(state)
-        for getting the table object of the the table that has thesame state as the state arg
+
     execute(userdata)
         this is the function that would be called when the state is called
     """
 
     def __init__(self):
         # from here we define the possible outcomes of the state.
-        super().__init__(
+        smach.State.__init__(self,
             outcomes=[
                 "object_detect_done",
                 "correct_order",
                 "wrong_order",
                 "missing_order",
+                "wrong_and_missing_order",
             ],
             output_keys=["no_of_object", "task", "wrong_drinks", "missing_drinks"],
             input_keys=["phase_no", "task"],
@@ -591,39 +583,39 @@ class ObjectDetection(smach.State):
             [object]: the result returned from the object detection action server
         """
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
+       # client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        client.wait_for_server()
+        #client.wait_for_server()
 
         # Sends the goal to the action server.
-        client.send_goal(goal_req)
+        #client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        client.wait_for_result()
+        #client.wait_for_result()
 
         # return the result of executing the action
-        return client.get_result()
+        #return client.get_result()
+        result=ObjDetInterfaceResult()
+        result.n_found_tags=2
+        result.found_tags=["bottle","fanta"]
+        result.match=False
+        return result
 
-    def get_table_by_state(self, state):
-        """This method gets the object of the point of interest that has thesame
-        state as the requested state
+    def check_wrong_drinks(self, expected_tags, found_tags):
+        wrong_drinks = []
+        for drink in found_tags:
+            if drink not in expected_tags:
+                wrong_drinks.append(drink)
+        return wrong_drinks
 
-        Args:
-            state (str): The requested state
-
-        Returns:
-            [object]: an object of a point of interest with thesame state as the
-            requested state
-        """
-        rospy.wait_for_service("get_table_by_state")
-        try:
-            poi_state = rospy.ServiceProxy("get_table_by_state", GetTableByState)
-            table = poi_state(state)
-            return table
-        except rospy.ServiceException as e:
-            print("Service call failed: {e}".format(e=e))
+    def check_missing_drinks(self, expected_tags, found_tags):
+        missing_drinks = []
+        for drink in expected_tags:
+            if drink not in found_tags:
+                missing_drinks.append(drink)
+        return missing_drinks
 
     def execute(self, userdata):
         """This is the function that is called when the state machine is at this state
@@ -634,13 +626,12 @@ class ObjectDetection(smach.State):
         Returns:
             [string]: This is the outcome of this state
         """
-        object_detect_goal = ObjectDetectionAction()
+        object_detect_goal = ObjDetInterfaceGoal()
         if userdata.phase_no == 1:
-            object_detect_goal.mode = "detect"
+            object_detect_goal.mode = 0  # Enumeration
             result = self.call_object_detect(object_detect_goal)
-            if result.result == "detected":
-                userdata.no_of_object = result.no_of_object
-                return "object_detect_done"
+            userdata.no_of_object = result.n_found_tags
+            return "object_detect_done"
 
         # Phase 2 does not require object detection
         elif userdata.phase_no == 2:
@@ -648,27 +639,43 @@ class ObjectDetection(smach.State):
 
         elif userdata.phase_no == 3:
             if userdata.task == "check order":
-                table = self.get_table_by_state("current serving")
-                object_detect_goal.mode = "check"
-                object_detect_goal.required_drinks = table.required_drinks
+                table_req = GetTableObjectRequest()
+                table_req.table_state = "current serving"
+                table = get_table_by_state(table_req)
+                object_detect_goal.mode = 2  # Comparison
+                object_detect_goal.expected_tags = table.required_drinks
                 result = self.call_object_detect(object_detect_goal)
-                if result.result == "correct":
+                if result.match:
                     userdata.task = "take item"
                     return "correct_order"
-                if result.result == "wrong":
-                    userdata.task = "report wrong"
-                    userdata.wrong_drinks = result.wrong_drinks
-                    return "wrong_order"
-                if result.result == "missing":
-                    userdata.task = "report missing"
-                    userdata.missing_drinks = result.missing_drinks
-                    return "missing_order"
+                if result.match == False:
+                    missing_drinks = self.check_missing_drinks(
+                        expected_tags=table.required_drinks,
+                        found_tags=result.found_tags,
+                    )
+                    wrong_drinks = self.check_wrong_drinks(
+                        expected_tags=table.required_drinks,
+                        found_tags=result.found_tags,
+                    )
+                    if len(missing_drinks) > 0:
+                        userdata.task = "report missing"
+                        userdata.missing_drinks = missing_drinks
+                        return "missing_order"
+                    elif len(wrong_drinks) > 0:
+                        userdata.task = "report wrong"
+                        userdata.wrong_drinks = wrong_drinks
+                        return "wrong_order"
+                    elif len(wrong_drinks) > 0 and len(missing_drinks) > 0:
+                        userdata.task = "report wrong and missing"
+                        userdata.missing_drinks = missing_drinks
+                        userdata.wrong_drinks = wrong_drinks
+                        return "wrong_and_missing_order"
 
 
 if __name__ == "__main__":
     rospy.init_node("sciroc_state_machine")
-
-    poi = ["counter", "table1", "table2", "table3", "table4", "table5", "table6"]
+    
+    #poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
 
     # Create a SMACH state machine
     Trial = smach.StateMachine(outcomes=["trial_finished"])
@@ -684,7 +691,7 @@ if __name__ == "__main__":
             # Add states to the container
             smach.StateMachine.add(
                 "NAVIGATE",
-                Navigate(poi),
+                Navigate(),
                 transitions={
                     "shop_explore_done": "HRI(Speak)",
                     "at_POI": "DETECT_PEOPLE",
@@ -697,7 +704,7 @@ if __name__ == "__main__":
                 PeoplePerception(),
                 transitions={
                     "people_present": "HRI(Speak)",
-                    "people_not_precent": "DETECT_OBJECT",
+                    "people_not_present": "DETECT_OBJECT",
                 },
                 remapping={"phase_no": "phase_value"},
             )
@@ -742,7 +749,7 @@ if __name__ == "__main__":
         with Phase2:
             smach.StateMachine.add(
                 "NAVIGATE",
-                Navigate(poi),
+                Navigate(),
                 transitions={
                     "at_require_order_table": "HRI(TakeOrder)",
                     "at_default_location": "at_default_location",
@@ -785,7 +792,7 @@ if __name__ == "__main__":
         with Phase3:
             smach.StateMachine.add(
                 "NAVIGATION",
-                Navigate(poi),
+                Navigate(),
                 transitions={
                     "at_counter": "HRI(Speak)",
                     "at_current_serving_table": "HRI(Speak)",
@@ -800,6 +807,7 @@ if __name__ == "__main__":
                     "order_reported": "CHECK_OBJECT",
                     "missing_reported": "CHECK_OBJECT",
                     "wrong_reported": "CHECK_OBJECT",
+                    "wrong_and_missing_order_reported": "CHECK_OBJECT",
                     "object_taken": "NAVIGATE",
                     "order_delivered": "UPDATE_POI_STATE",
                 },
@@ -818,6 +826,7 @@ if __name__ == "__main__":
                     "correct_order": "HRI(Speak)",
                     "wrong_order": "HRI(Speak)",
                     "missing_order": "HRI(Speak)",
+                    "wrong_and_missing_order": "HRI(Speak)",
                 },
                 remapping={"phase_no": "phase_value", "task": "task"},
             )
