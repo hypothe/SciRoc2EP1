@@ -18,7 +18,7 @@ from sciroc_navigation.srv import GoToPOI
 from sciroc_poi_state.srv import UpdatePOIState, GetTableByState
 from sciroc_poi_state.srv import UpdatePOIStateRequest
 
-
+import people_perception.msg
 ##########-------------- CREATING THE STATE ----------------------##########################
 
 
@@ -478,14 +478,14 @@ class PeoplePerception(smach.State):
             [object]: the result returned from the people percept action server
         """
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("people_percept", PeoplePerceptionAction)
+        client = actionlib.SimpleActionClient("people_detection", PeopleCounter)
 
         # Waits until the action server has started up and started
         # listening for goals.
         client.wait_for_server()
 
         # Sends the goal to the action server.
-        client.send_goal(goal_req)
+        client.send_goal()
 
         # Waits for the server to finish performing the action.
         client.wait_for_result()
