@@ -167,7 +167,7 @@ class HRI(smach.State):
             self,
             outcomes=[
                 "announced",
-                "greeted",
+                "greeted"
             ],
             output_keys=["task"],
             input_keys=[
