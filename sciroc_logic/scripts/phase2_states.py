@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import rospy
 
 # importing the labrary for the creation of the state machine
@@ -196,48 +194,3 @@ class POI_State(smach.State):
         result = True
         if result:
             return "updated"
-
-
-if __name__ == "__main__":
-    rospy.init_node("sciroc_state_machine")
-
-    Phase2 = smach.StateMachine(outcomes=["phase2_finished"])
-
-    # Open the container
-    with Phase2:
-        smach.StateMachine.add(
-            "NAVIGATE",
-            Navigate(),
-            transitions={
-                "at_require_order_table": "HRI(TakeOrder)",
-            },
-        )
-
-        smach.StateMachine.add(
-            "HRI(TakeOrder)",
-            HRI(),
-            transitions={"order_taken": "UPDATE_POI_STATE"},
-        )
-
-        smach.StateMachine.add(
-            "UPDATE_POI_STATE",
-            POI_State(),
-            transitions={"updated": "phase2_finished"},
-            remapping={
-                "current_poi": "current_poi",
-                "order_list": "order_list",
-            },
-        )
-
-    # Create and start the introspection server
-    sis = smach_ros.IntrospectionServer(
-        "server_name", Phase2, "SciRoc2EP1 Logic State Machine"
-    )
-    sis.start()
-
-    # Execute SMACH plan
-    outcome = Phase2.execute()
-
-    # Wait for ctrl-c to stop the application
-    rospy.spin()
-    sis.stop()

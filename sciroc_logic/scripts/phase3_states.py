@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import rospy
 
 # importing the labrary for the creation of the state machine
@@ -351,72 +349,3 @@ class POI_State(smach.State):
         result = True
         if result:
             return "updated"
-
-
-if __name__ == "__main__":
-    rospy.init_node("sciroc_state_machine")
-
-    Phase3 = smach.StateMachine(outcomes=["phase3_finished"])
-    Phase3.userdata.task = "report order"
-
-    # Open the container
-    with Phase3:
-        smach.StateMachine.add(
-            "NAVIGATE",
-            Navigate(),
-            transitions={
-                "at_counter": "HRI(Speak)",
-                "at_current_serving_table": "HRI(Speak)",
-            },
-            remapping={"task": "task"},
-        )
-
-        smach.StateMachine.add(
-            "HRI(Speak)",
-            HRI(),
-            transitions={
-                "order_reported": "CHECK_OBJECT",
-                "missing_reported": "CHECK_OBJECT",
-                "wrong_reported": "CHECK_OBJECT",
-                "wrong_and_missing_order_reported": "CHECK_OBJECT",
-                "object_taken": "NAVIGATE",
-                "order_delivered": "UPDATE_POI_STATE",
-            },
-            remapping={
-                "task": "task",
-                "missing_drinks": "missing_drinks",
-                "wrong_drinks": "wrong_drinks",
-            },
-        )
-
-        smach.StateMachine.add(
-            "CHECK_OBJECT",
-            ObjectDetection(),
-            transitions={
-                "correct_order": "HRI(Speak)",
-                "wrong_order": "HRI(Speak)",
-                "missing_order": "HRI(Speak)",
-                "wrong_and_missing_order": "HRI(Speak)",
-            },
-            remapping={"task": "task"},
-        )
-
-        smach.StateMachine.add(
-            "UPDATE_POI_STATE",
-            POI_State(),
-            transitions={"updated": "phase3_finished"},
-            remapping={"current_poi": "current_poi"},
-        )
-
-    # Create and start the introspection server
-    sis = smach_ros.IntrospectionServer(
-        "server_name", Phase3, "SciRoc2EP1 Logic State Machine"
-    )
-    sis.start()
-
-    # Execute SMACH plan
-    outcome = Phase3.execute()
-
-    # Wait for ctrl-c to stop the application
-    rospy.spin()
-    sis.stop()
