@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import rospy
 
 # importing the labrary for the creation of the state machine
@@ -67,10 +69,7 @@ class Navigate(smach.State):
 
         smach.State.__init__(
             self,
-            outcomes=[
-                "at_counter",
-                "at_current_serving_table",
-            ],
+            outcomes=["at_counter", "at_current_serving_table", "at_default_location"],
             output_keys=["current_poi", "task"],
             input_keys=["task"],
         )
@@ -109,6 +108,10 @@ class Navigate(smach.State):
                 userdata.current_poi = "table1"
                 userdata.task = "announce order arrival"
                 return "at_current_serving_table"
+        if userdata.task == "go to default location":
+            result = True
+            if result:
+                return "at_default_location"
 
 
 ###+++++++++++++++++++ HUMAN ROBOT INTERACTION (HRI) +++++++++++++++++++++###
@@ -317,8 +320,9 @@ class POI_State(smach.State):
     def __init__(self):
         smach.State.__init__(
             self,
-            outcomes=["updated"],
+            outcomes=["updated", "final_update_done"],
             input_keys=["current_poi"],
+            output_keys=["task"],
         )
 
     def call_poi_state_service(self, update_state_request=UpdatePOIStateRequest()):
@@ -343,9 +347,14 @@ class POI_State(smach.State):
         update_state_request.need_serving = False
         update_state_request.already_served = True
         update_state_request.current_serving = False
-        result = self.call_poi_state_service(
-             update_state_request=update_state_request
-        )
-        #result = True
+        # result = self.call_poi_state_service(
+        #     update_state_request=update_state_request
+        # )
+        result = False
         if result:
+            # if there still exist a table that need serving
             return "updated"
+        if result == False:
+            # if there is no more table that need serving
+            userdata.task = "go to default location"
+            return "final_update_done"

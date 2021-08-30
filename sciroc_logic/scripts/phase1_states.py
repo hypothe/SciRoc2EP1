@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import rospy
 
 # importing the labrary for the creation of the state machine
@@ -17,11 +19,11 @@ from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # # people perception package
-from people_perception.msg import (
-     PeopleCounterAction,
-     PeopleCounterGoal,
-     PeopleCounterResult,
-)
+# from people_perception.msg import (
+#     PeopleCounterAction,
+#     PeopleCounterGoal,
+#     PeopleCounterResult,
+# )
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal, HRIResult
@@ -114,8 +116,8 @@ class POI_State(smach.State):
         set_state_request.no_of_people = userdata.no_of_people
         set_state_request.no_of_object = userdata.no_of_object
 
-        result = self.call_poi_state_service(update_state_request=set_state_request)
-        #result = True
+        # result = self.call_poi_state_service(update_state_request=set_state_request)
+        result = True
         if result:
             return "saved"
 
@@ -189,33 +191,31 @@ class PeoplePerception(smach.State):
     def call_people_percept(self):
         # Creates the SimpleActionClient, passing the type of the action
 
-        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
+        # client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        client.wait_for_server()
+        # client.wait_for_server()
 
         # Sends the goal to the action server.
 
-        goal = PeopleCounterGoal()
-        client.send_goal(goal)
+        # goal = PeopleCounterGoal()
+        # client.send_goal(goal)
         # Waits for the server to finish performing the action.
-        client.wait_for_result()
-      
+        # client.wait_for_result()
+
         # return the result of executing the action
-        return client.get_result()
-        #_res = PeopleCounterResult()
-        #_res.n_people = 4
-        #return _res
+        # return client.get_result()
+        _res = PeopleCounterResult()
+        _res.n_people = 4
+        return _res
 
     def execute(self, userdata):
-        result = self.call_people_percept()
-        userdata.no_of_people = result.n_people
-        #print("detected p")
-        #print(result.n_people)
-        #n_people = 3
-        #userdata.no_of_people = n_people
-        if result.n_people > 0:
+        # result = self.call_people_percept()
+        # userdata.no_of_people = result.n_people
+        n_people = 3
+        userdata.no_of_people = n_people
+        if n_people > 0:
             return "people_present"
         else:
             return "people_not_present"

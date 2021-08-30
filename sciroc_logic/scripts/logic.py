@@ -135,7 +135,7 @@ if __name__ == "__main__":
             },
         )
 
-        Phase3 = smach.StateMachine(outcomes=["phase3_finished"])
+        Phase3 = smach.StateMachine(outcomes=["phase3_finished", "trial_done"])
         Phase3.userdata.task = "report order"
 
         # Open the container
@@ -146,6 +146,7 @@ if __name__ == "__main__":
                 transitions={
                     "at_counter": "HRI(Speak)",
                     "at_current_serving_table": "HRI(Speak)",
+                    "at_default_location": "trial_done",
                 },
                 remapping={"task": "task"},
             )
@@ -183,11 +184,16 @@ if __name__ == "__main__":
             smach.StateMachine.add(
                 "UPDATE_POI_STATE",
                 phase3_states.POI_State(),
-                transitions={"updated": "phase3_finished"},
+                transitions={
+                    "updated": "phase3_finished",
+                    "final_update_done": "NAVIGATE",
+                },
                 remapping={"current_poi": "current_poi"},
             )
         smach.StateMachine.add(
-            "PHASE_3", Phase3, transitions={"phase3_finished": "trial_finished"}
+            "PHASE_3",
+            Phase3,
+            transitions={"phase3_finished": "PHASE_2", "trial_done": "trial_finished"},
         )
 
         # Create and start the introspection server
