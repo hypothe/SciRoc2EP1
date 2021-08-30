@@ -343,9 +343,9 @@ class POI_State(smach.State):
         update_state_request.need_serving = False
         update_state_request.already_served = True
         update_state_request.current_serving = False
-        # result = self.call_poi_state_service(
-        #     update_state_request=update_state_request
-        # )
-        result = True
+        result = self.call_poi_state_service(
+             update_state_request=update_state_request
+        )
+        #result = True
         if result:
             return "updated"

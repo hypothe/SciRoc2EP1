@@ -32,7 +32,7 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
-require_table = ["table1", "table3"]
+require_table = []
 
 poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
 
@@ -93,14 +93,13 @@ class Navigate(smach.State):
 
         table_req = GetTableObjectRequest()
         table_req.table_state = "require order"
-        # table = get_table_by_state(table_req)
-        # if len(table.require_order_list) > 0:
-
-        # result = self.call_nav_service(table.table_id)
-        result = True
+        table = get_table_by_state(table_req)
+        if len(table.require_order_list) > 0:
+            result = self.call_nav_service(table.table_id)
+          # result = True
         if result:
-            # userdata.current_poi = table.table_id
-            userdata.current_poi = require_table.pop()
+            userdata.current_poi = table.table_id
+            #userdata.current_poi = require_table.pop()
             return "at_require_order_table"
 
 
@@ -186,11 +185,11 @@ class POI_State(smach.State):
         ]
         update_state_request.require_order = False
         update_state_request.current_serving = True
-        update_state_request.required_drinks = userdata.order_list
-
-        # result = self.call_poi_state_service(
-        #     update_state_request=update_state_request
-        # )
-        result = True
+        #update_state_request.required_drinks = userdata.order_list
+        update_state_request.required_drinks =["coffe","bu","jhbu"]
+        result = self.call_poi_state_service(
+            update_state_request=update_state_request
+        )
+        #result = True
         if result:
             return "updated"
