@@ -18,7 +18,7 @@ from sciroc_navigation.srv import GoToPOI
 from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
-# # people perception package
+# people perception package
 # from people_perception.msg import (
 #     PeopleCounterAction,
 #     PeopleCounterGoal,
@@ -34,7 +34,32 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
-poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
+import time
+
+counter = "counter"
+poi = ["t1", "t2", "t3", "t4", "t5", "t6"]
+
+
+def get_table_by_state(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 0
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
+
+
+def get_table_by_id(req):
+    rospy.wait_for_service("get_table_object")
+    try:
+        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        req.mode = 1
+        table = poi_state(req)
+        return table
+    except rospy.ServiceException as e:
+        print("Service call failed: {e}".format(e=e))
 
 
 class Navigate(smach.State):
@@ -47,9 +72,6 @@ class Navigate(smach.State):
             ],
             output_keys=["current_poi"],
         )
-        # This would be changed later, only here for testing reasons
-        self.poi = poi[1:]
-        self.counter = poi[0]
 
     def call_nav_service(self, next_poi):
         rospy.wait_for_service("go_to_poi_service")
@@ -66,17 +88,19 @@ class Navigate(smach.State):
             print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
-        if len(self.poi) == 0:
-            next_poi = self.counter
+        if len(poi) == 0:
+            next_poi = counter
             # result = self.call_nav_service(next_poi)
             result = True
+            time.sleep(5)
             if result:
                 userdata.current_poi = next_poi
                 return "shop_explore_done"
-        else:
-            next_poi = self.poi.pop()
+        elif len(poi) > 0:
+            next_poi = poi.pop(0)
             # result = self.call_nav_service(next_poi)
             result = True
+            time.sleep(5)
             if result:
                 userdata.current_poi = next_poi
                 return "at_POI"
@@ -116,8 +140,8 @@ class POI_State(smach.State):
         set_state_request.no_of_people = userdata.no_of_people
         set_state_request.no_of_object = userdata.no_of_object
 
-        # result = self.call_poi_state_service(update_state_request=set_state_request)
-        result = True
+        result = self.call_poi_state_service(update_state_request=set_state_request)
+        time.sleep(5)
         if result:
             return "saved"
 
@@ -141,23 +165,20 @@ class HRI(smach.State):
 
     def call_hri_action(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        # client = actionlib.SimpleActionClient("hri", HRIAction)
+        client = actionlib.SimpleActionClient("hri", HRIAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
-        # client.send_goal(goal_req)
+        client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        result = HRIResult()
-        result.result = True
-        result.order_list = ["", "", ""]
+        return client.get_result()
 
     def execute(self, userdata):
         hri_goal = HRIGoal()
@@ -166,12 +187,14 @@ class HRI(smach.State):
             # hri_goal.text = self.get_announce_text()
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(5)
             if result:
                 return "announced"
         else:
             hri_goal.mode = 2  # Greet Customer
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(5)
             if result:
                 return "greeted"
 
@@ -191,30 +214,29 @@ class PeoplePerception(smach.State):
     def call_people_percept(self):
         # Creates the SimpleActionClient, passing the type of the action
 
-        # client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
+        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
 
-        # goal = PeopleCounterGoal()
+        goal = PeopleCounterGoal()
         # client.send_goal(goal)
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        _res = PeopleCounterResult()
-        _res.n_people = 4
-        return _res
+        return client.get_result()
 
     def execute(self, userdata):
         # result = self.call_people_percept()
         # userdata.no_of_people = result.n_people
         n_people = 3
         userdata.no_of_people = n_people
+        time.sleep(5)
+
         if n_people > 0:
             return "people_present"
         else:
@@ -237,30 +259,26 @@ class ObjectDetection(smach.State):
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        # client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
+        client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
-        # client.send_goal(goal_req)
+        client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        result = ObjDetInterfaceResult()
-        result.n_found_tags = 2
-        result.found_tags = ["bottle", "fanta"]
-        result.match = False
-        return result
+        return client.get_result()
 
     def execute(self, userdata):
         object_detect_goal = ObjDetInterfaceGoal()
         object_detect_goal.mode = 0  # Enumeration
         # result = self.call_object_detect(object_detect_goal)
-        n_found_tags = 3
+        n_found_tags = 0
         userdata.no_of_object = n_found_tags
+        time.sleep(5)
         return "object_detect_done"
