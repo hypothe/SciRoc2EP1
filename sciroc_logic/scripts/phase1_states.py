@@ -92,7 +92,7 @@ class Navigate(smach.State):
             next_poi = counter
             # result = self.call_nav_service(next_poi)
             result = True
-            time.sleep(5)
+            time.sleep(2)
             if result:
                 userdata.current_poi = next_poi
                 return "shop_explore_done"
@@ -100,7 +100,7 @@ class Navigate(smach.State):
             next_poi = poi.pop(0)
             # result = self.call_nav_service(next_poi)
             result = True
-            time.sleep(5)
+            time.sleep(2)
             if result:
                 userdata.current_poi = next_poi
                 return "at_POI"
@@ -141,7 +141,7 @@ class POI_State(smach.State):
         set_state_request.no_of_object = userdata.no_of_object
 
         result = self.call_poi_state_service(update_state_request=set_state_request)
-        time.sleep(5)
+        time.sleep(2)
         if result:
             return "saved"
 
@@ -187,14 +187,14 @@ class HRI(smach.State):
             # hri_goal.text = self.get_announce_text()
             # result = self.call_hri_action(hri_goal)
             result = True
-            time.sleep(5)
+            time.sleep(2)
             if result:
                 return "announced"
         else:
             hri_goal.mode = 2  # Greet Customer
             # result = self.call_hri_action(hri_goal)
             result = True
-            time.sleep(5)
+            time.sleep(2)
             if result:
                 return "greeted"
 
@@ -235,7 +235,7 @@ class PeoplePerception(smach.State):
         # userdata.no_of_people = result.n_people
         n_people = 3
         userdata.no_of_people = n_people
-        time.sleep(5)
+        time.sleep(2)
 
         if n_people > 0:
             return "people_present"
@@ -280,5 +280,5 @@ class ObjectDetection(smach.State):
         # result = self.call_object_detect(object_detect_goal)
         n_found_tags = 0
         userdata.no_of_object = n_found_tags
-        time.sleep(5)
+        time.sleep(2)
         return "object_detect_done"

@@ -34,9 +34,9 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
-require_table = ["table1", "table3"]
+import time
 
-poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
+counter = "counter"
 
 
 def get_table_by_state(req):
@@ -73,9 +73,6 @@ class Navigate(smach.State):
             output_keys=["current_poi", "task"],
             input_keys=["task"],
         )
-        # This would be changed later, only here for testing reasons
-        self.poi = poi[1:]
-        self.counter = poi[0]
 
     def call_nav_service(self, next_poi):
         rospy.wait_for_service("go_to_poi_service")
@@ -93,22 +90,25 @@ class Navigate(smach.State):
 
     def execute(self, userdata):
         if userdata.task == "report order":
-            # result = self.call_nav_service(self.counter)
+            # result = self.call_nav_service(counter)
             result = True
+            time.sleep(2)
             if result:
-                userdata.current_poi = self.counter
+                userdata.current_poi = counter
                 return "at_counter"
         if userdata.task == "deliver order":
             table_req = GetTableObjectRequest()
             table_req.table_state = "current serving"
-            # table = get_table_by_state(table_req)
+            table = get_table_by_state(table_req)
             # result = self.call_nav_service(table.table_id)
+            time.sleep(2)
             result = True
             if result:
-                userdata.current_poi = "table1"
+                userdata.current_poi = table.table_id
                 userdata.task = "announce order arrival"
                 return "at_current_serving_table"
         if userdata.task == "go to default location":
+            time.sleep(2)
             result = True
             if result:
                 return "at_default_location"
@@ -142,23 +142,20 @@ class HRI(smach.State):
 
     def call_hri_action(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        # client = actionlib.SimpleActionClient("hri", HRIAction)
+        client = actionlib.SimpleActionClient("hri", HRIAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
-        # client.send_goal(goal_req)
+        client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        result = HRIResult()
-        result.result = True
-        result.order_list = ["", "", ""]
+        return client.get_result()
 
     def execute(self, userdata):
 
@@ -168,6 +165,7 @@ class HRI(smach.State):
             hri_goal.mode = 0  # Announce Text
             # hri_goal.text = self.get_announce_text()
             # result = self.call_hri_action(hri_goal)
+            time.sleep(2)
             result = True
             if result:
                 userdata.task = "check object"
@@ -179,6 +177,7 @@ class HRI(smach.State):
             # hri_goal.missing_drinks.extend(userdata.missing_drinks)
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "missing_reported"
@@ -189,6 +188,7 @@ class HRI(smach.State):
             # # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "wrong_reported"
@@ -200,6 +200,7 @@ class HRI(smach.State):
             # # hri_goal.missing_drinks.extend(userdata.missing_drinks)
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "wrong_and_missing_order_reported"
@@ -208,6 +209,7 @@ class HRI(smach.State):
             hri_goal.mode = 3  # Take Item
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(2)
             if result:
                 userdata.task = "deliver order"
                 return "object_taken"
@@ -215,6 +217,7 @@ class HRI(smach.State):
             hri_goal.mode = 4  # Drop Item
             # result = self.call_hri_action(hri_goal)
             result = True
+            time.sleep(2)
             if result:
                 return "order_delivered"
 
@@ -239,25 +242,20 @@ class ObjectDetection(smach.State):
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        # client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
+        client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
-        # client.send_goal(goal_req)
+        client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        result = ObjDetInterfaceResult()
-        result.n_found_tags = 2
-        result.found_tags = ["bottle", "fanta"]
-        result.match = False
-        return result
+        return client.get_result()
 
     def check_wrong_drinks(self, expected_tags, found_tags):
         wrong_drinks = []
@@ -279,10 +277,11 @@ class ObjectDetection(smach.State):
         if userdata.task == "check object":
             table_req = GetTableObjectRequest()
             table_req.table_state = "current serving"
-            # table = get_table_by_state(table_req)
+            table = get_table_by_state(table_req)
             object_detect_goal.mode = 2  # Comparison
-            # object_detect_goal.expected_tags = table.required_drinks
+            object_detect_goal.expected_tags = table.required_drinks
             # result = self.call_object_detect(object_detect_goal)
+            time.sleep(2)
             result = True
             if result:
                 userdata.task = "take item"
@@ -338,6 +337,7 @@ class POI_State(smach.State):
 
     def execute(self, userdata):
         update_state_request = UpdatePOIStateRequest()
+        update_state_request.task = "update"
         update_state_request.table_id = userdata.current_poi
         update_state_request.updated_states = [
             "need serving",
@@ -347,14 +347,17 @@ class POI_State(smach.State):
         update_state_request.need_serving = False
         update_state_request.already_served = True
         update_state_request.current_serving = False
-        # result = self.call_poi_state_service(
-        #     update_state_request=update_state_request
-        # )
-        result = False
+        result = self.call_poi_state_service(update_state_request=update_state_request)
+        time.sleep(2)
         if result:
-            # if there still exist a table that need serving
-            return "updated"
-        if result == False:
-            # if there is no more table that need serving
-            userdata.task = "go to default location"
-            return "final_update_done"
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "require order"
+            table = get_table_by_state(table_req)
+            if len(table.require_order_list) > 0:
+                # if there still exist a table that need serving
+                userdata.task = "report order"
+                return "updated"
+            else:
+                # if there is no more table that need serving
+                userdata.task = "go to default location"
+                return "final_update_done"

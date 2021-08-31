@@ -34,15 +34,15 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
-require_table = ["table1", "table3"]
+import time
 
-poi = ["counter", "t1", "t2", "t3", "t4", "t5", "t6"]
+counter = "counter"
 
 
 def get_table_by_state(req):
-    rospy.wait_for_service("get_table_object")
+    rospy.wait_for_service("/get_table_object")
     try:
-        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        poi_state = rospy.ServiceProxy("/get_table_object", GetTableObject)
         req.mode = 0
         table = poi_state(req)
         return table
@@ -51,9 +51,9 @@ def get_table_by_state(req):
 
 
 def get_table_by_id(req):
-    rospy.wait_for_service("get_table_object")
+    rospy.wait_for_service("/get_table_object")
     try:
-        poi_state = rospy.ServiceProxy("get_table_object", GetTableObject)
+        poi_state = rospy.ServiceProxy("/get_table_object", GetTableObject)
         req.mode = 1
         table = poi_state(req)
         return table
@@ -73,9 +73,6 @@ class Navigate(smach.State):
             ],
             output_keys=["current_poi"],
         )
-        # This would be changed later, only here for testing reasons
-        self.poi = poi[1:]
-        self.counter = poi[0]
 
     def call_nav_service(self, next_poi):
         rospy.wait_for_service("go_to_poi_service")
@@ -95,14 +92,12 @@ class Navigate(smach.State):
 
         table_req = GetTableObjectRequest()
         table_req.table_state = "require order"
-        # table = get_table_by_state(table_req)
-        # if len(table.require_order_list) > 0:
-
+        table = get_table_by_state(table_req)
         # result = self.call_nav_service(table.table_id)
         result = True
+        time.sleep(2)
         if result:
-            # userdata.current_poi = table.table_id
-            userdata.current_poi = require_table.pop()
+            userdata.current_poi = table.table_id
             return "at_require_order_table"
 
 
@@ -124,23 +119,20 @@ class HRI(smach.State):
 
     def call_hri_action(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        # client = actionlib.SimpleActionClient("hri", HRIAction)
+        client = actionlib.SimpleActionClient("hri", HRIAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
-        # client.wait_for_server()
+        client.wait_for_server()
 
         # Sends the goal to the action server.
-        # client.send_goal(goal_req)
+        client.send_goal(goal_req)
 
         # Waits for the server to finish performing the action.
-        # client.wait_for_result()
+        client.wait_for_result()
 
         # return the result of executing the action
-        # return client.get_result()
-        result = HRIResult()
-        result.result = True
-        result.order_list = ["", "", ""]
+        return client.get_result()
 
     def execute(self, userdata):
 
@@ -148,6 +140,7 @@ class HRI(smach.State):
 
         hri_goal.mode = 1  # Take Order
         # result = self.call_hri_action(hri_goal)
+        time.sleep(2)
         result = True
         if result:
             # userdata.order_list = result.required_drinks
@@ -177,7 +170,6 @@ class POI_State(smach.State):
             print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
-
         update_state_request = UpdatePOIStateRequest()
         update_state_request.task = "update"
         update_state_request.table_id = userdata.current_poi
@@ -190,9 +182,7 @@ class POI_State(smach.State):
         update_state_request.current_serving = True
         update_state_request.required_drinks = userdata.order_list
 
-        # result = self.call_poi_state_service(
-        #     update_state_request=update_state_request
-        # )
-        result = True
+        result = self.call_poi_state_service(update_state_request=update_state_request)
+        time.sleep(2)
         if result:
             return "updated"
