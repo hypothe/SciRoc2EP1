@@ -72,6 +72,7 @@ if __name__ == "__main__":
                 "DETECT_OBJECT",
                 phase1_states.ObjectDetection(),
                 transitions={"object_detect_done": "SAVE_POI_STATE"},
+                remapping={"current_poi": "current_poi"},
             )
 
             smach.StateMachine.add(
@@ -178,7 +179,7 @@ if __name__ == "__main__":
                     "missing_order": "HRI(Speak)",
                     "wrong_and_missing_order": "HRI(Speak)",
                 },
-                remapping={"task": "task"},
+                remapping={"task": "task", "current_poi": "current_poi"},
             )
 
             smach.StateMachine.add(
