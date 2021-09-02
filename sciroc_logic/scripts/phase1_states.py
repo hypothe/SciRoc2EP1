@@ -90,16 +90,16 @@ class Navigate(smach.State):
     def execute(self, userdata):
         if len(poi) == 0:
             next_poi = counter
-            # result = self.call_nav_service(next_poi)
-            result = True
-            time.sleep(2)
+            result = self.call_nav_service(next_poi)
+            #result = True
+            #time.sleep(2)
             if result:
                 userdata.current_poi = next_poi
                 return "shop_explore_done"
         elif len(poi) > 0:
             next_poi = poi.pop(0)
-            # result = self.call_nav_service(next_poi)
-            result = True
+            result = self.call_nav_service(next_poi)
+            #result = True
             time.sleep(2)
             if result:
                 userdata.current_poi = next_poi

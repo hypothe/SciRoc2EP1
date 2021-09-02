@@ -242,7 +242,7 @@ class ObjectDetection(smach.State):
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("objdet_interface", ObjectDetInterfaceAction)
+        client = actionlib.SimpleActionClient("objdet_interface", ObjDetInterfaceAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
