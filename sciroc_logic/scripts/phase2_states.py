@@ -170,19 +170,19 @@ class POI_State(smach.State):
             print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
-        update_state_request = UpdatePOIStateRequest()
-        update_state_request.task = "update"
-        update_state_request.table_id = userdata.current_poi
-        update_state_request.updated_states = [
+        update_state_request_ = UpdatePOIStateRequest()
+        update_state_request_.task = "update"
+        update_state_request_.table_id = userdata.current_poi
+        update_state_request_.updated_states = [
             "require order",
             "required drinks",
             "current serving",
         ]
-        update_state_request.require_order = False
-        update_state_request.current_serving = True
-        update_state_request.required_drinks = userdata.order_list
+        update_state_request_.require_order = False
+        update_state_request_.current_serving = True
+        update_state_request_.required_drinks = userdata.order_list
 
-        result = self.call_poi_state_service(update_state_request=update_state_request)
+        result = self.call_poi_state_service(update_state_request=update_state_request_)
         time.sleep(2)
         if result:
             return "updated"

@@ -237,12 +237,12 @@ class ObjectDetection(smach.State):
                 "wrong_and_missing_order",
             ],
             output_keys=["task", "wrong_drinks", "missing_drinks"],
-            input_keys=["task"],
+            input_keys=["task", "current_poi"],
         )
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
+        client = actionlib.SimpleActionClient("objdet_interface", ObjectDetInterfaceAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
@@ -280,23 +280,24 @@ class ObjectDetection(smach.State):
             table = get_table_by_state(table_req)
             object_detect_goal.mode = 2  # Comparison
             object_detect_goal.expected_tags = table.required_drinks
-            # result = self.call_object_detect(object_detect_goal)
-            time.sleep(2)
-            result = True
+
+            result = self.call_object_detect(object_detect_goal)
+            #time.sleep(2)
+            #result = True
             if result:
                 userdata.task = "take item"
                 return "correct_order"
             elif result == False:
-                missing_drinks = ["", ""]
-                wrong_drinks = []
-                # missing_drinks = self.check_missing_drinks(
-                #     expected_tags=table.required_drinks,
-                #     found_tags=result.found_tags,
-                # )
-                # wrong_drinks = self.check_wrong_drinks(
-                #     expected_tags=table.required_drinks,
-                #     found_tags=result.found_tags,
-                # )
+                #missing_drinks = ["", ""]
+                #wrong_drinks = []
+                missing_drinks = self.check_missing_drinks(
+                    expected_tags=table.required_drinks,
+                    found_tags=result.found_tags,
+                )
+                wrong_drinks = self.check_wrong_drinks(
+                    expected_tags=table.required_drinks,
+                    found_tags=result.found_tags,
+                )
                 if len(missing_drinks) > 0:
                     userdata.task = "report missing"
                     userdata.missing_drinks = missing_drinks

@@ -254,12 +254,13 @@ class ObjectDetection(smach.State):
             outcomes=[
                 "object_detect_done",
             ],
+            input_keys=["current_poi"],
             output_keys=["no_of_object"],
         )
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
-        client = actionlib.SimpleActionClient("object_detect", ObjectPerceptionAction)
+        client = actionlib.SimpleActionClient("objdet_interface", ObjDetInterfaceAction)
 
         # Waits until the action server has started up and started
         # listening for goals.
@@ -277,8 +278,13 @@ class ObjectDetection(smach.State):
     def execute(self, userdata):
         object_detect_goal = ObjDetInterfaceGoal()
         object_detect_goal.mode = 0  # Enumeration
-        # result = self.call_object_detect(object_detect_goal)
-        n_found_tags = 0
+
+        ## TODO: Here we should not actually pass the current poi,
+        ## but the poi of pass the POI of the table, not of
+        ## its "approaching point"
+        object_detect_goal.table_id = userdata.current_poi
+        result = self.call_object_detect(object_detect_goal)
+        n_found_tags = result.n_found_tags
         userdata.no_of_object = n_found_tags
-        time.sleep(2)
+        #time.sleep(2)
         return "object_detect_done"
