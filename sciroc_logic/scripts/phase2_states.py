@@ -93,9 +93,9 @@ class Navigate(smach.State):
         table_req = GetTableObjectRequest()
         table_req.table_state = "require order"
         table = get_table_by_state(table_req)
-        # result = self.call_nav_service(table.table_id)
-        result = True
-        time.sleep(2)
+        result = self.call_nav_service(table.table_id)
+        #result = True
+        #time.sleep(2)
         if result:
             userdata.current_poi = table.table_id
             return "at_require_order_table"
@@ -181,7 +181,6 @@ class POI_State(smach.State):
         update_state_request_.require_order = False
         update_state_request_.current_serving = True
         update_state_request_.required_drinks = userdata.order_list
-
         result = self.call_poi_state_service(update_state_request=update_state_request_)
         time.sleep(2)
         if result:
