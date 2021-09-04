@@ -11,6 +11,9 @@ import smach_ros
 import actionlib
 from actionlib_msgs.msg._GoalStatus import GoalStatus
 
+# topic mulitplexer
+from topic_tools.srv import MuxSelect
+
 # navigation service message
 from sciroc_navigation.srv import GoToPOI
 
@@ -19,11 +22,11 @@ from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # # people perception package
-# from people_perception.msg import (
-#     PeopleCounterAction,
-#     PeopleCounterGoal,
-#     PeopleCounterResult,
-# )
+from people_perception.msg import (
+    PeopleCounterAction,
+    PeopleCounterGoal,
+    PeopleCounterResult,
+)
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal, HRIResult
@@ -39,6 +42,15 @@ import phase1_states, phase2_states, phase3_states
 
 if __name__ == "__main__":
     rospy.init_node("sciroc_state_machine")
+    # TODO: retrieve the topic name from the param server
+    orig_point_head_topic = '/head_controller/point_head_action/goal'
+    point_head_topic = '/head_controller/point_head_action_navigation/goal'
+    point_head_mux_name = "point_head_mux"
+    rospy.wait_for_service(point_head_mux_name, timeout = 10)
+    try:
+        head_mux_srvr = rospy.ServiceProxy(point_head_topic, MuxSelect)
+    except rospy.ServiceException as e:
+        print("Service connection failed: {e}".format(e=e))
 
     # Create a SMACH state machine
     Trial = smach.StateMachine(outcomes=["trial_finished"])
@@ -52,7 +64,7 @@ if __name__ == "__main__":
             # Add states to the container
             smach.StateMachine.add(
                 "NAVIGATE",
-                phase1_states.Navigate(),
+                phase1_states.Navigate(head_mux_srvr, point_head_topic, orig_point_head_topic),
                 transitions={
                     "shop_explore_done": "HRI(Speak)",
                     "at_POI": "DETECT_PEOPLE",
@@ -106,7 +118,7 @@ if __name__ == "__main__":
         with Phase2:
             smach.StateMachine.add(
                 "NAVIGATE",
-                phase2_states.Navigate(),
+                phase2_states.Navigate(head_mux_srvr, point_head_topic, orig_point_head_topic),
                 transitions={
                     "at_require_order_table": "HRI(TakeOrder)",
                 },

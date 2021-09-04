@@ -65,7 +65,7 @@ def get_table_by_id(req):
 
 
 class Navigate(smach.State):
-    def __init__(self):
+    def __init__(self, head_mux_srvr, point_head_topic, orig_point_head_topic):
 
         smach.State.__init__(
             self,
@@ -73,6 +73,10 @@ class Navigate(smach.State):
             output_keys=["current_poi", "task"],
             input_keys=["task"],
         )
+        
+        self.head_mux_srvr = head_mux_srvr
+        self.point_head_topic = point_head_topic
+        self.orig_point_head_topic = orig_point_head_topic
 
     def call_nav_service(self, next_poi):
         rospy.wait_for_service("go_to_poi_service")
@@ -89,13 +93,23 @@ class Navigate(smach.State):
             print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
+        # Give control of the head movement to the pal_head_manager
+        try:
+            head_mux_topic = MuxSelect()
+            head_mux_topic.request.topic = point_head_topic
+            self.head_mux_srvr(head_mux_topic)
+        except rospy.ServiceException as e:
+            print("Multiplexer service call failed: {e}".format(e=e))
+
+        retval = ''
+
         if userdata.task == "report order":
             # result = self.call_nav_service(counter)
             result = True
             time.sleep(2)
             if result:
                 userdata.current_poi = counter
-                return "at_counter"
+                retval = "at_counter"
         if userdata.task == "deliver order":
             table_req = GetTableObjectRequest()
             table_req.table_state = "current serving"
@@ -106,12 +120,22 @@ class Navigate(smach.State):
             if result:
                 userdata.current_poi = table.table_id
                 userdata.task = "announce order arrival"
-                return "at_current_serving_table"
+                retval = "at_current_serving_table"
         if userdata.task == "go to default location":
             time.sleep(2)
             result = True
             if result:
-                return "at_default_location"
+                retval = "at_default_location"
+
+        # Take head control away from pal_head_manager
+        try:
+            head_mux_topic = MuxSelect()
+            head_mux_topic.request.topic = orig_point_head_topic
+            self.head_mux_srvr(head_mux_topic)
+        except rospy.ServiceException as e:
+            print("Multiplexer service call failed: {e}".format(e=e))
+        finally:
+            return retval
 
 
 ###+++++++++++++++++++ HUMAN ROBOT INTERACTION (HRI) +++++++++++++++++++++###

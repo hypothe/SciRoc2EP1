@@ -11,6 +11,9 @@ import smach_ros
 import actionlib
 from actionlib_msgs.msg._GoalStatus import GoalStatus
 
+# topic mulitplexer
+from topic_tools.srv import MuxSelect
+
 # navigation service message
 from sciroc_navigation.srv import GoToPOI
 
@@ -18,12 +21,12 @@ from sciroc_navigation.srv import GoToPOI
 from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
-# people perception package
-# from people_perception.msg import (
-#     PeopleCounterAction,
-#     PeopleCounterGoal,
-#     PeopleCounterResult,
-# )
+people perception package
+from people_perception.msg import (
+    PeopleCounterAction,
+    PeopleCounterGoal,
+    PeopleCounterResult,
+)
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal, HRIResult
@@ -63,7 +66,7 @@ def get_table_by_id(req):
 
 
 class Navigate(smach.State):
-    def __init__(self):
+    def __init__(self, head_mux_srvr, point_head_topic, orig_point_head_topic):
         smach.State.__init__(
             self,
             outcomes=[
@@ -72,8 +75,12 @@ class Navigate(smach.State):
             ],
             output_keys=["current_poi"],
         )
+        self.head_mux_srvr = head_mux_srvr
+        self.point_head_topic = point_head_topic
+        self.orig_point_head_topic = orig_point_head_topic
 
     def call_nav_service(self, next_poi):
+
         rospy.wait_for_service("go_to_poi_service")
         try:
             go_to_poi = rospy.ServiceProxy("go_to_poi_service", GoToPOI)
@@ -88,6 +95,16 @@ class Navigate(smach.State):
             print("Service call failed: {e}".format(e=e))
 
     def execute(self, userdata):
+        # Give control of the head movement to the pal_head_manager
+        try:
+            head_mux_topic = MuxSelect()
+            head_mux_topic.request.topic = point_head_topic
+            self.head_mux_srvr(head_mux_topic)
+        except rospy.ServiceException as e:
+            print("Multiplexer service call failed: {e}".format(e=e))
+
+        retval = ''
+
         if len(poi) == 0:
             next_poi = counter
             result = self.call_nav_service(next_poi)
@@ -95,7 +112,7 @@ class Navigate(smach.State):
             #time.sleep(2)
             if result:
                 userdata.current_poi = next_poi
-                return "shop_explore_done"
+                retval = "shop_explore_done"
         elif len(poi) > 0:
             next_poi = poi.pop(0)
             result = self.call_nav_service(next_poi)
@@ -103,7 +120,16 @@ class Navigate(smach.State):
             time.sleep(2)
             if result:
                 userdata.current_poi = next_poi
-                return "at_POI"
+                retval = "at_POI"
+        # Take head control away from pal_head_manager
+        try:
+            head_mux_topic = MuxSelect()
+            head_mux_topic.request.topic = orig_point_head_topic
+            self.head_mux_srvr(head_mux_topic)
+        except rospy.ServiceException as e:
+            print("Multiplexer service call failed: {e}".format(e=e))
+        finally:
+            return retval
 
 
 ###+++++++++++++++++++ POINT OF INTEREST STATE (POI STATE) +++++++++++++++++++++###
@@ -231,11 +257,11 @@ class PeoplePerception(smach.State):
         return client.get_result()
 
     def execute(self, userdata):
-        # result = self.call_people_percept()
-        # userdata.no_of_people = result.n_people
-        n_people = 3
-        userdata.no_of_people = n_people
-        time.sleep(2)
+        result = self.call_people_percept()
+        userdata.no_of_people = result.n_people
+        #n_people = 3
+        #userdata.no_of_people = n_people
+        #time.sleep(2)
 
         if n_people > 0:
             return "people_present"
