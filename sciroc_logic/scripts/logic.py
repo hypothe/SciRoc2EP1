@@ -44,7 +44,7 @@ if __name__ == "__main__":
     Trial = smach.StateMachine(outcomes=["trial_finished"])
 
     with Trial:
-        Phase1 = smach.StateMachine(outcomes=["phase1_finished"])
+        Phase1 = smach.StateMachine(outcomes=["phase1_finished", "end_of_trial"])
 
         # Open the container
         with Phase1:
@@ -81,6 +81,7 @@ if __name__ == "__main__":
                 transitions={
                     "greeted": "DETECT_OBJECT",
                     "announced": "phase1_finished",
+                    "announced_and_done": "end_of_trial"
                 },
                 remapping={"current_poi": "current_poi"},
             )
@@ -97,7 +98,7 @@ if __name__ == "__main__":
             )
 
         smach.StateMachine.add(
-            "PHASE_1", Phase1, transitions={"phase1_finished": "PHASE_2"}
+            "PHASE_1", Phase1, transitions={"phase1_finished": "PHASE_2", "end_of_trial":"trial_finished"}
         )
 
         Phase2 = smach.StateMachine(outcomes=["phase2_finished"])

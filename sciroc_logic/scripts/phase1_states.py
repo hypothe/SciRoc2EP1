@@ -82,7 +82,7 @@ class Navigate(smach.State):
             if result.result == "goal reached":
                 return True
             else:
-                print("Point of interest [{poi}] does not exist".format(poi=poi))
+                print("Point of interest [{poi}] does not exist".format(poi=next_poi))
                 return False
         except rospy.ServiceException as e:
             print("Service call failed: {e}".format(e=e))
@@ -156,12 +156,90 @@ class HRI(smach.State):
             outcomes=[
                 "announced",
                 "greeted",
+                "announced_and_done"
             ],
             input_keys=["current_poi"],
         )
 
-    def get_announce_text(self):
-        pass
+    
+def get_announce_text():
+        table_req = GetTableObjectRequest()
+        table_req.table_state = "require order"
+        table = get_table_by_state(table_req)
+
+        if len(table.need_serving_list) == 0:
+            need_serving_text = "no table"
+            customer_text = ""
+        elif len(table.need_serving_list) > 0:
+            need_serving_text = " "
+            customer_text = " "
+            last_table = table.need_serving_list.pop()
+            tabl_req = GetTableObjectRequest()
+            tabl_req.table_id = last_table
+            tabl = get_table_by_id(tabl_req)
+            last_customer_text = (
+                last_table + "  has " + str(tabl.no_of_people) + " customers waiting "
+            )
+            if len(table.need_serving_list) > 0:
+                for item in table.need_serving_list:
+                    need_serving_text = need_serving_text + item + " " + "and "
+                    tab_req = GetTableObjectRequest()
+                    tab_req.table_id = last_table
+                    tab = get_table_by_id(tab_req)
+                    customer_text = ("  "+
+                        customer_text
+                        + item
+                        + " has "
+                        + str(tab.no_of_people)
+                        + " customers waiting and "
+                    )
+            customer_text = customer_text + last_customer_text + ", "
+            need_serving_text = need_serving_text + last_table + " needs serving, "
+
+        if len(table.need_cleaning_list) == 0:
+            need_cleaning_text = "no table"
+        elif len(table.need_cleaning_list) > 0:
+            need_cleaning_text = " "
+            last_table = table.need_cleaning_list.pop()
+            if len(table.need_cleaning_list) > 0:
+                for item in table.need_cleaning_list:
+                    need_cleaning_text = "   " + need_cleaning_text + item + " " + "and  "
+            need_cleaning_text = (
+                need_cleaning_text + last_table + " needs to be cleaned,  "
+            )
+
+        if len(table.ready_list) == 0:
+            ready_text = "no table"
+        elif len(table.ready_list) > 0:
+            ready_text = " "
+            last_table = table.ready_list.pop()
+            if len(table.ready_list) > 0:
+                for item in table.ready_list:
+                    ready_text = ready_text + item + " " + "and "
+            ready_text = ready_text + last_table + " is ready to take new customers, "
+
+        if len(table.already_served_list) == 0:
+            already_served_text = "no table is"
+        elif len(table.already_served_list) > 0:
+            already_served_text = " "
+            last_table = table.already_served_list.pop()
+            if len(table.already_served_list) > 0:
+                for item in table.already_served_list:
+                    already_served_text = already_served_text + item + " " + "and "
+            already_served_text = (
+                already_served_text + last_table + " is already served  "
+            )
+
+        announce_text = (
+            "Hello there Barrista,   how's it going?    After exploring the restaurant,   here are the states of each of the tables.  "
+            + need_serving_text
+            + customer_text
+            + need_cleaning_text
+            + ready_text
+            + already_served_text
+        )
+        return announce_text
+
 
     def call_hri_action(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
@@ -184,12 +262,20 @@ class HRI(smach.State):
         hri_goal = HRIGoal()
         if userdata.current_poi == "counter":
             hri_goal.mode = 0  # Announce text
-            # hri_goal.text = self.get_announce_text()
+            hri_goal.text = self.get_announce_text()
             # result = self.call_hri_action(hri_goal)
             result = True
             time.sleep(2)
             if result:
-                return "announced"
+                table_req = GetTableObjectRequest()
+                table_req.table_state = "require order"
+                table = get_table_by_state(table_req)
+                if len(table.require_order_list) > 0:
+                    # if there exist a table that need serving 
+                    return "announced"
+                else: 
+                    # if there is no table that needs serving 
+                    return "announced_and_done"
         else:
             hri_goal.mode = 2  # Greet Customer
             # result = self.call_hri_action(hri_goal)

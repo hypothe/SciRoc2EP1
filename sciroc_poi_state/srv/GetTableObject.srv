@@ -16,3 +16,4 @@ string[] need_cleaning_list
 string[] require_order_list
 string[] already_served_list
 string[] current_serving_list
+string[] ready_list 

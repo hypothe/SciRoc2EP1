@@ -147,6 +147,7 @@ def generate_table_response(req_mes):
             table = POI[table_ids[0]]
     elif req_mes.mode == 1:
         table = POI[req_mes.table_id]
+        table_ids = []
 
     if len(table_ids) > 0 or req_mes.mode == 1:
         table_response.table_id = table.table_id
@@ -163,6 +164,7 @@ def generate_table_response(req_mes):
         table_response.require_order_list = table_states["require order"]
         table_response.already_served_list = table_states["already served"]
         table_response.current_serving_list = table_states["current serving"]
+        table_response.ready_list = table_states["ready"]
 
     else:
         table_response.need_serving_list = table_states["need serving"]
@@ -170,6 +172,7 @@ def generate_table_response(req_mes):
         table_response.require_order_list = table_states["require order"]
         table_response.already_served_list = table_states["already served"]
         table_response.current_serving_list = table_states["current serving"]
+        table_response.ready_list = table_states["ready"]
 
     return table_response
 

@@ -83,7 +83,7 @@ class Navigate(smach.State):
             if result.result == "goal reached":
                 return True
             else:
-                print("Point of interest [{poi}] does not exist".format(poi=poi))
+                print("Point of interest [{poi}] does not exist".format(poi=next_poi))
                 return False
         except rospy.ServiceException as e:
             print("Service call failed: {e}".format(e=e))
@@ -137,8 +137,81 @@ class HRI(smach.State):
             ],
         )
 
-    def get_announce_text(self):
-        pass
+    def get_announce_text(self, task, missing=[], wrong=[]):
+        if task == "report order":
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "current serving"
+            table = get_table_by_state(table_req)
+            text = (
+                "The customers on   " + table.table_id + "   has made an Order for   "
+            )
+            for item in table.required_drinks:
+                text = text + "   " + item + "   "
+
+            res_text = (
+                text
+                + "   I will be here   waiting for you to place the order on the counter  "
+            )
+            return res_text
+        elif task == "report missing":
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "current serving"
+            table = get_table_by_state(table_req)
+            text = (
+                "The customers on   " + table.table_id + "   has made an Order for   "
+            )
+            for item in table.required_drinks:
+                text = text + "   " + item + "   "
+            miss_text = " "
+            for items in missing:
+                miss_text = miss_text + "   " + items + "   "
+            res_text = (
+                "I'm sorry   but    "
+                + miss_text
+                + " is missing from the requested order   "
+                + text
+            )
+            return res_text
+        elif task == "report wrong":
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "current serving"
+            table = get_table_by_state(table_req)
+            text = (
+                "The customers on   " + table.table_id + "   has made an Order for   "
+            )
+            for item in table.required_drinks:
+                text = text + "   " + item + "   "
+            wrong_text = " "
+            for items in wrong:
+                wrong_text = wrong_text + "   " + items + "   "
+            res_text = (
+                "I'm sorry   but  i did not ask for  " + wrong_text + "   " + text
+            )
+            return res_text
+        elif task == "report wrong and missing":
+            table_req = GetTableObjectRequest()
+            table_req.table_state = "current serving"
+            table = get_table_by_state(table_req)
+            text = (
+                "The customers on   " + table.table_id + "   has made an Order for   "
+            )
+            for item in table.required_drinks:
+                text = text + "   " + item + "   "
+            wrong_text = " "
+            for items in wrong:
+                wrong_text = wrong_text + "   " + items + "   "
+            miss_text = " "
+            for items in missing:
+                miss_text = miss_text + "   " + items + "   "
+
+            res_text = (
+                "I'm sorry    but   i did not ask for   "
+                + wrong_text
+                + "   and also   "
+                + miss_text
+                + "  is missing from the order"
+            )
+            return res_text
 
     def call_hri_action(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
@@ -163,7 +236,7 @@ class HRI(smach.State):
 
         if userdata.task == "report order":
             hri_goal.mode = 0  # Announce Text
-            # hri_goal.text = self.get_announce_text()
+            hri_goal.text = self.get_announce_text(task=userdata.task)
             # result = self.call_hri_action(hri_goal)
             time.sleep(2)
             result = True
@@ -173,8 +246,9 @@ class HRI(smach.State):
 
         elif userdata.task == "report missing":
             hri_goal.mode = 0  # Announce Text
-            # hri_goal.text = self.get_announce_text()
-            # hri_goal.missing_drinks.extend(userdata.missing_drinks)
+            hri_goal.text = self.get_announce_text(
+                task=userdata.task, missing=userdata.missing_drinks
+            )
             # result = self.call_hri_action(hri_goal)
             result = True
             time.sleep(2)
@@ -184,8 +258,9 @@ class HRI(smach.State):
 
         elif userdata.task == "report wrong":
             hri_goal.mode = 0  # Announce Text
-            # hri_goal.text = self.get_announce_text()
-            # # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
+            hri_goal.text = self.get_announce_text(
+                task=userdata.task, wrong=userdata.wrong_drinks
+            )
             # result = self.call_hri_action(hri_goal)
             result = True
             time.sleep(2)
@@ -195,9 +270,11 @@ class HRI(smach.State):
 
         elif userdata.task == "report wrong and missing":
             hri_goal.mode = 0  # Announce Text
-            # hri_goal.text = self.get_announce_text()
-            # # hri_goal.wrong_drinks.extend(userdata.wrong_drinks)
-            # # hri_goal.missing_drinks.extend(userdata.missing_drinks)
+            hri_goal.text = self.get_announce_text(
+                task=userdata.task,
+                wrong=userdata.wrong_drinks,
+                missing=userdata.missing_drinks,
+            )
             # result = self.call_hri_action(hri_goal)
             result = True
             time.sleep(2)
@@ -282,14 +359,14 @@ class ObjectDetection(smach.State):
             object_detect_goal.expected_tags = table.required_drinks
 
             result = self.call_object_detect(object_detect_goal)
-            #time.sleep(2)
-            #result = True
+            # time.sleep(2)
+            # result = True
             if result:
                 userdata.task = "take item"
                 return "correct_order"
             elif result == False:
-                #missing_drinks = ["", ""]
-                #wrong_drinks = []
+                # missing_drinks = ["", ""]
+                # wrong_drinks = []
                 missing_drinks = self.check_missing_drinks(
                     expected_tags=table.required_drinks,
                     found_tags=result.found_tags,

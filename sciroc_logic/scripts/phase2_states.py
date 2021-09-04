@@ -83,7 +83,7 @@ class Navigate(smach.State):
             if result.result == "goal reached":
                 return True
             else:
-                print("Point of interest [{poi}] does not exist".format(poi=poi))
+                print("Point of interest [{poi}] does not exist".format(poi=next_poi))
                 return False
         except rospy.ServiceException as e:
             print("Service call failed: {e}".format(e=e))
