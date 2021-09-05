@@ -33,7 +33,11 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceGoal,
     ObjDetInterfaceResult,
 )
-
+# pal_head_manager control disable
+from pal_common_msgs.msg import (
+    DisableAction
+    DisableGoal
+)
 import time
 
 counter = "counter"
@@ -226,7 +230,7 @@ class HRI(smach.State):
 
 
 class ObjectDetection(smach.State):
-    def __init__(self):
+    def __init__(self, head_ctrl_dsbl_client):
         # from here we define the possible outcomes of the state.
         smach.State.__init__(
             self,
@@ -239,6 +243,7 @@ class ObjectDetection(smach.State):
             output_keys=["task", "wrong_drinks", "missing_drinks"],
             input_keys=["task", "current_poi"],
         )
+        self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
@@ -271,7 +276,13 @@ class ObjectDetection(smach.State):
                 missing_drinks.append(drink)
         return missing_drinks
 
-    def execute(self, userdata):
+    def execute(self, userdata):        
+        if self.head_ctrl_dsbl_client:
+            dsbl_head_ctrl_goal = DisableGoal()
+            # TODO: get this duration from param server, not hardcoded
+            dsbl_head_ctrl_goal.duration = 10
+            self.head_ctrl_dsbl_client.send_goal(dsbl_head_ctrl_goal)
+            # no need for waiting
         object_detect_goal = ObjDetInterfaceGoal()
 
         if userdata.task == "check object":
