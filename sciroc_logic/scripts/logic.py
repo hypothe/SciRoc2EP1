@@ -34,12 +34,31 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
+# pal_head_manager control disable
+from pal_common_msgs.msg import (
+    DisableAction
+    DisableGoal
+)
+
 # Importing the states for the state machines
 import phase1_states, phase2_states, phase3_states
 
+srvr_connect_max_attempts_ = 10
+dsbl_head_ctrl_name_ = 'pal_head_manager/disable'
+
 if __name__ == "__main__":
     rospy.init_node("sciroc_state_machine")
+    # TODO: action server pal_head_manager/disable
+    head_ctrl_dsbl_client = actionlib.SimpleActionClient(dsbl_head_ctrl_name_, DisableAction)
+    server_found = False
+    while not server_found and ii < srvr_connect_max_attempts_:
+        ii += 1
+        rospy.logwarn("Waiting for %s" dsbl_head_ctrl_name_)
+        server_found = head_ctrl_dsbl_client.wait_for_server(rospy.Duration(1))
+    if not server_found:
+        head_ctrl_dsbl_client = None
 
+    if 
     # Create a SMACH state machine
     Trial = smach.StateMachine(outcomes=["trial_finished"])
 
@@ -61,7 +80,7 @@ if __name__ == "__main__":
 
             smach.StateMachine.add(
                 "DETECT_PEOPLE",
-                phase1_states.PeoplePerception(),
+                phase1_states.PeoplePerception(head_ctrl_dsbl_client),
                 transitions={
                     "people_present": "HRI(Speak)",
                     "people_not_present": "DETECT_OBJECT",
@@ -70,7 +89,7 @@ if __name__ == "__main__":
 
             smach.StateMachine.add(
                 "DETECT_OBJECT",
-                phase1_states.ObjectDetection(),
+                phase1_states.ObjectDetection(head_ctrl_dsbl_client),
                 transitions={"object_detect_done": "SAVE_POI_STATE"},
                 remapping={"current_poi": "current_poi"},
             )
@@ -173,7 +192,7 @@ if __name__ == "__main__":
 
             smach.StateMachine.add(
                 "CHECK_OBJECT",
-                phase3_states.ObjectDetection(),
+                phase3_states.ObjectDetection(head_ctrl_dsbl_client),
                 transitions={
                     "correct_order": "HRI(Speak)",
                     "wrong_order": "HRI(Speak)",

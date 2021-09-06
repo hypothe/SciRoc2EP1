@@ -34,6 +34,13 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceResult,
 )
 
+# pal_head_manager control disable
+from pal_common_msgs.msg import (
+    DisableAction
+    DisableGoal
+)
+
+
 import time
 
 counter = "counter"
@@ -289,13 +296,14 @@ def get_announce_text():
 
 
 class PeoplePerception(smach.State):
-    def __init__(self):
+    def __init__(self, head_ctrl_dsbl_client):
         # from here we define the possible outcomes of the state.
         smach.State.__init__(
             self,
             outcomes=["people_present", "people_not_present"],
             output_keys=["no_of_people"],
         )
+        self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
 
     def call_people_percept(self):
         # Creates the SimpleActionClient, passing the type of the action
@@ -317,11 +325,17 @@ class PeoplePerception(smach.State):
         return client.get_result()
 
     def execute(self, userdata):
-        # result = self.call_people_percept()
-        # userdata.no_of_people = result.n_people
-        n_people = 3
+        if self.head_ctrl_dsbl_client:
+            dsbl_head_ctrl_goal = DisableGoal()
+            # TODO: get this duration from param server, not hardcoded
+            dsbl_head_ctrl_goal.duration = 10
+            self.head_ctrl_dsbl_client.send_goal(dsbl_head_ctrl_goal)
+            # no need for waiting
+
+        result = self.call_people_percept()
+        userdata.no_of_people = result.n_people
+        
         userdata.no_of_people = n_people
-        time.sleep(2)
 
         if n_people > 0:
             return "people_present"
@@ -333,7 +347,7 @@ class PeoplePerception(smach.State):
 
 
 class ObjectDetection(smach.State):
-    def __init__(self):
+    def __init__(self, head_ctrl_dsbl_client):
         # from here we define the possible outcomes of the state.
         smach.State.__init__(
             self,
@@ -343,6 +357,7 @@ class ObjectDetection(smach.State):
             input_keys=["current_poi"],
             output_keys=["no_of_object"],
         )
+        self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
 
     def call_object_detect(self, goal_req):
         # Creates the SimpleActionClient, passing the type of the action
@@ -362,6 +377,13 @@ class ObjectDetection(smach.State):
         return client.get_result()
 
     def execute(self, userdata):
+        if self.head_ctrl_dsbl_client:
+            dsbl_head_ctrl_goal = DisableGoal()
+            # TODO: get this duration from param server, not hardcoded
+            dsbl_head_ctrl_goal.duration = 10
+            self.head_ctrl_dsbl_client.send_goal(dsbl_head_ctrl_goal)
+            # no need for waiting
+            
         object_detect_goal = ObjDetInterfaceGoal()
         object_detect_goal.mode = 0  # Enumeration
 
