@@ -299,7 +299,7 @@ class PeoplePerception(smach.State):
 		# from here we define the possible outcomes of the state.
 		smach.State.__init__(
 			self,
-			outcomes=["people_present", "people_not_present"],,
+			outcomes=["people_present", "people_not_present"],
             input_keys=["current_poi"],
 			output_keys=["no_of_people"],
 		)
