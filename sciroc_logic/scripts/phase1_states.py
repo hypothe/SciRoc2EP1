@@ -19,11 +19,11 @@ from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # people perception package
-# from people_perception.msg import (
-#     PeopleCounterAction,
-#     PeopleCounterGoal,
-#     PeopleCounterResult,
-# )
+from people_perception.msg import (
+    PeopleCounter2Action,
+    PeopleCounter2Goal,
+    PeopleCounter2Result,
+)
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal, HRIResult
@@ -301,6 +301,7 @@ class PeoplePerception(smach.State):
         smach.State.__init__(
             self,
             outcomes=["people_present", "people_not_present"],
+            input_keys=["current_poi"],
             output_keys=["no_of_people"],
         )
         self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
@@ -308,7 +309,7 @@ class PeoplePerception(smach.State):
     def call_people_percept(self):
         # Creates the SimpleActionClient, passing the type of the action
 
-        client = actionlib.SimpleActionClient("people_detection", PeopleCounterAction)
+        client = actionlib.SimpleActionClient("people_detection", PeopleCounter2Action)
 
         # Waits until the action server has started up and started
         # listening for goals.
@@ -316,8 +317,9 @@ class PeoplePerception(smach.State):
 
         # Sends the goal to the action server.
 
-        goal = PeopleCounterGoal()
-        # client.send_goal(goal)
+        goal = PeopleCounter2Goal()
+        goal.table_poi = userdata.current_poi
+        client.send_goal(goal)
         # Waits for the server to finish performing the action.
         client.wait_for_result()
 
