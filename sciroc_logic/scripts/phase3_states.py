@@ -35,7 +35,7 @@ from sciroc_objdet.msg import (
 )
 # pal_head_manager control disable
 from pal_common_msgs.msg import (
-    DisableAction
+    DisableAction,
     DisableGoal
 )
 import time

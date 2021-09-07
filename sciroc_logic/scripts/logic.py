@@ -19,11 +19,11 @@ from sciroc_poi_state.srv import UpdatePOIState, GetTableObject
 from sciroc_poi_state.srv import UpdatePOIStateRequest, GetTableObjectRequest
 
 # # people perception package
-# from people_perception.msg import (
-#     PeopleCounterAction,
-#     PeopleCounterGoal,
-#     PeopleCounterResult,
-# )
+from people_perception.msg import (
+    PeopleCounter2Action,
+    PeopleCounter2Goal,
+    PeopleCounter2Result,
+)
 
 # human robot interaction package
 from sciroc_hri.msg import HRIAction, HRIGoal, HRIResult
@@ -36,7 +36,7 @@ from sciroc_objdet.msg import (
 
 # pal_head_manager control disable
 from pal_common_msgs.msg import (
-    DisableAction
+    DisableAction,
     DisableGoal
 )
 
@@ -51,14 +51,14 @@ if __name__ == "__main__":
     # TODO: action server pal_head_manager/disable
     head_ctrl_dsbl_client = actionlib.SimpleActionClient(dsbl_head_ctrl_name_, DisableAction)
     server_found = False
+    ii = 0
     while not server_found and ii < srvr_connect_max_attempts_:
         ii += 1
-        rospy.logwarn("Waiting for %s" dsbl_head_ctrl_name_)
+        rospy.logwarn("Waiting for %s" % dsbl_head_ctrl_name_)
         server_found = head_ctrl_dsbl_client.wait_for_server(rospy.Duration(1))
     if not server_found:
         head_ctrl_dsbl_client = None
 
-    if 
     # Create a SMACH state machine
     Trial = smach.StateMachine(outcomes=["trial_finished"])
 
