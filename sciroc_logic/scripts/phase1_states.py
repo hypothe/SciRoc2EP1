@@ -44,7 +44,7 @@ from pal_common_msgs.msg import (
 import time
 
 counter = "counter"
-poi = ["t1", "t2", "t3", "t4", "t5", "t6"]
+#poi = ["t1", "t2", "t3", "t4", "t5", "t6"]
 
 
 def get_table_by_state(req):
@@ -77,6 +77,7 @@ class Navigate(smach.State):
 				"at_POI",
 				"shop_explore_done",
 			],
+			intput_keys=["poi"],
 			output_keys=["current_poi"],
 		)
 

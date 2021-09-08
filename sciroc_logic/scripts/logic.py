@@ -51,6 +51,8 @@ if __name__ == "__main__":
     # TODO: action server pal_head_manager/disable
     head_ctrl_dsbl_client = actionlib.SimpleActionClient(dsbl_head_ctrl_name_, DisableAction)
     server_found = False
+    poi = rospy.get_param("/mmap/poi/table_names", ['t1', 't2', 't3', 't4', 't5', 't6'])
+
     ii = 0
     while not server_found and ii < srvr_connect_max_attempts_:
         ii += 1
@@ -76,6 +78,7 @@ if __name__ == "__main__":
                     "shop_explore_done": "HRI(Speak)",
                     "at_POI": "DETECT_PEOPLE",
                 },
+                remapping={"poi": "poi"},
             )
 
             smach.StateMachine.add(
