@@ -73,12 +73,11 @@ if __name__ == "__main__":
             # Add states to the container
             smach.StateMachine.add(
                 "NAVIGATE",
-                phase1_states.Navigate(),
+                phase1_states.Navigate(poi),
                 transitions={
                     "shop_explore_done": "HRI(Speak)",
                     "at_POI": "DETECT_PEOPLE",
                 },
-                remapping={"poi": "poi"},
             )
 
             smach.StateMachine.add(

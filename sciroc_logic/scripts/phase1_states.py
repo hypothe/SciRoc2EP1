@@ -70,16 +70,16 @@ def get_table_by_id(req):
 
 
 class Navigate(smach.State):
-	def __init__(self):
+	def __init__(self, poi):
 		smach.State.__init__(
 			self,
 			outcomes=[
 				"at_POI",
 				"shop_explore_done",
 			],
-			intput_keys=["poi"],
 			output_keys=["current_poi"],
 		)
+		self.poi = poi
 
 	def call_nav_service(self, next_poi):
 		rospy.wait_for_service("go_to_poi_service")
@@ -96,7 +96,7 @@ class Navigate(smach.State):
 			print("Service call failed: {e}".format(e=e))
 
 	def execute(self, userdata):
-		if len(poi) == 0:
+		if len(self.poi) == 0:
 			next_poi = counter
 			result = self.call_nav_service(next_poi)
 			#result = True
@@ -104,8 +104,8 @@ class Navigate(smach.State):
 			if result:
 				userdata.current_poi = next_poi
 				return "shop_explore_done"
-		elif len(poi) > 0:
-			next_poi = poi.pop(0)
+		elif len(self.poi) > 0:
+			next_poi = self.poi.pop(0)
 			result = self.call_nav_service(next_poi)
 			#result = True
 			time.sleep(2)
@@ -301,7 +301,7 @@ class PeoplePerception(smach.State):
 		smach.State.__init__(
 			self,
 			outcomes=["people_present", "people_not_present"],
-            input_keys=["current_poi"],
+      input_keys=["current_poi"],
 			output_keys=["no_of_people"],
 		)
 		self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
@@ -335,11 +335,10 @@ class PeoplePerception(smach.State):
 			# no need for waiting
 
 		result = self.call_people_percept(userdata)
-		userdata.no_of_people = result.n_people
-		
-		#userdata.no_of_people = n_people
+		no_of_people = result.n_people
+		userdata.no_of_people = no_of_people
 
-		if userdata.no_of_people > 0:
+		if no_of_people > 0:
 			return "people_present"
 		else:
 			return "people_not_present"
