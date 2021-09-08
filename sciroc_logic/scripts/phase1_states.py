@@ -305,7 +305,7 @@ class PeoplePerception(smach.State):
 		)
 		self.head_ctrl_dsbl_client = head_ctrl_dsbl_client
 
-	def call_people_percept(self):
+	def call_people_percept(self, userdata):
 		# Creates the SimpleActionClient, passing the type of the action
 
 		client = actionlib.SimpleActionClient("people_detection", PeopleCounter2Action)
@@ -333,12 +333,12 @@ class PeoplePerception(smach.State):
 			self.head_ctrl_dsbl_client.send_goal(dsbl_head_ctrl_goal)
 			# no need for waiting
 
-		result = self.call_people_percept()
+		result = self.call_people_percept(userdata)
 		userdata.no_of_people = result.n_people
 		
-		userdata.no_of_people = n_people
+		#userdata.no_of_people = n_people
 
-		if n_people > 0:
+		if userdata.no_of_people > 0:
 			return "people_present"
 		else:
 			return "people_not_present"
