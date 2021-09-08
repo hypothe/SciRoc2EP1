@@ -182,6 +182,6 @@ class POI_State(smach.State):
         update_state_request_.current_serving = True
         update_state_request_.required_drinks = userdata.order_list
         result = self.call_poi_state_service(update_state_request=update_state_request_)
-        time.sleep(2)
+        #time.sleep(2)
         if result:
             return "updated"

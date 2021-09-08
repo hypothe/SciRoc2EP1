@@ -35,7 +35,7 @@ from sciroc_objdet.msg import (
 )
 # pal_head_manager control disable
 from pal_common_msgs.msg import (
-    DisableAction
+    DisableAction,
     DisableGoal
 )
 import time
@@ -96,7 +96,7 @@ class Navigate(smach.State):
         if userdata.task == "report order":
             # result = self.call_nav_service(counter)
             result = True
-            time.sleep(2)
+            #time.sleep(2)
             if result:
                 userdata.current_poi = counter
                 return "at_counter"
@@ -105,14 +105,14 @@ class Navigate(smach.State):
             table_req.table_state = "current serving"
             table = get_table_by_state(table_req)
             # result = self.call_nav_service(table.table_id)
-            time.sleep(2)
+            #time.sleep(2)
             result = True
             if result:
                 userdata.current_poi = table.table_id
                 userdata.task = "announce order arrival"
                 return "at_current_serving_table"
         if userdata.task == "go to default location":
-            time.sleep(2)
+            #time.sleep(2)
             result = True
             if result:
                 return "at_default_location"
