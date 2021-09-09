@@ -376,7 +376,7 @@ class ObjectDetection(smach.State):
             if result:
                 userdata.task = "take item"
                 return "correct_order"
-            elif result == False:
+            elif result.match == False:
                 # missing_drinks = ["", ""]
                 # wrong_drinks = []
                 missing_drinks = self.check_missing_drinks(
