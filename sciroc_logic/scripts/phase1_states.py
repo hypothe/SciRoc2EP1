@@ -270,9 +270,9 @@ class HRI(smach.State):
 		if userdata.current_poi == "counter":
 			hri_goal.mode = 0  # Announce text
 			hri_goal.text = self.get_announce_text()
-			# result = self.call_hri_action(hri_goal)
-			result = True
-			time.sleep(2)
+			result = self.call_hri_action(hri_goal)
+			# result = True
+			# time.sleep(2)
 			if result:
 				table_req = GetTableObjectRequest()
 				table_req.table_state = "require order"
@@ -285,8 +285,8 @@ class HRI(smach.State):
 					return "announced_and_done"
 		else:
 			hri_goal.mode = 2  # Greet Customer
-			# result = self.call_hri_action(hri_goal)
-			result = True
+			result = self.call_hri_action(hri_goal)
+			#result = True
 			#time.sleep(2)
 			if result:
 				return "greeted"
@@ -335,7 +335,9 @@ class PeoplePerception(smach.State):
 			# no need for waiting
 
 		result = self.call_people_percept(userdata)
-		no_of_people = result.n_people
+		## TEST:
+		#no_of_people = result.n_people
+		no_of_people = 2
 		userdata.no_of_people = no_of_people
 
 		if no_of_people > 0:

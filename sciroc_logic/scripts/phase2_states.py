@@ -139,12 +139,12 @@ class HRI(smach.State):
         hri_goal = HRIGoal()
 
         hri_goal.mode = 1  # Take Order
-        # result = self.call_hri_action(hri_goal)
-        time.sleep(2)
-        result = True
+        result = self.call_hri_action(hri_goal)
+        #time.sleep(2)
+        #result = True
         if result:
             # userdata.order_list = result.required_drinks
-            userdata.order_list = ["fanta", "malt", "cocacola"]
+            userdata.order_list = ["fanta", "ringo", "cocacola"]
             return "order_taken"
 
 
