@@ -94,8 +94,8 @@ class Navigate(smach.State):
 
     def execute(self, userdata):
         if userdata.task == "report order":
-            # result = self.call_nav_service(counter)
-            result = True
+            result = self.call_nav_service(counter)
+            #result = True
             #time.sleep(2)
             if result:
                 userdata.current_poi = counter
@@ -104,7 +104,7 @@ class Navigate(smach.State):
             table_req = GetTableObjectRequest()
             table_req.table_state = "current serving"
             table = get_table_by_state(table_req)
-            # result = self.call_nav_service(table.table_id)
+            result = self.call_nav_service(table.table_id)
             #time.sleep(2)
             result = True
             if result:
@@ -115,6 +115,7 @@ class Navigate(smach.State):
             #time.sleep(2)
             result = True
             if result:
+                userdata.current_poi = counter
                 return "at_default_location"
 
 

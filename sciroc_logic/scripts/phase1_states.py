@@ -335,7 +335,9 @@ class PeoplePerception(smach.State):
 			# no need for waiting
 
 		result = self.call_people_percept(userdata)
-		no_of_people = result.n_people
+		## TEST:
+		#no_of_people = result.n_people
+		no_of_people = 2
 		userdata.no_of_people = no_of_people
 
 		if no_of_people > 0:
