@@ -144,7 +144,7 @@ class HRI(smach.State):
         result = True
         if result:
             # userdata.order_list = result.required_drinks
-            userdata.order_list = ["fanta", "malt", "cocacola"]
+            userdata.order_list = ["fanta", "ringo", "cocacola"]
             return "order_taken"
 
 

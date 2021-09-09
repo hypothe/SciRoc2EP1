@@ -113,7 +113,8 @@ class Navigate(smach.State):
                 return "at_current_serving_table"
         if userdata.task == "go to default location":
             #time.sleep(2)
-            result = True
+            result = self.call_nav_service(counter)
+            #result = True
             if result:
                 userdata.current_poi = counter
                 return "at_default_location"
@@ -370,13 +371,15 @@ class ObjectDetection(smach.State):
             object_detect_goal.mode = 2  # Comparison
             object_detect_goal.expected_tags = table.required_drinks
 
+            rospy.loginfo("ObjDet expected tags %s " % object_detect_goal.expected_tags)
+
             result = self.call_object_detect(object_detect_goal)
             # time.sleep(2)
             # result = True
-            if result:
+            if result.match:
                 userdata.task = "take item"
                 return "correct_order"
-            elif result.match == False:
+            elif not result.match:
                 # missing_drinks = ["", ""]
                 # wrong_drinks = []
                 missing_drinks = self.check_missing_drinks(
