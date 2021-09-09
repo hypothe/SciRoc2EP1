@@ -292,7 +292,8 @@ class HRI(smach.State):
             hri_goal.mode = 3  # Take Item
             # result = self.call_hri_action(hri_goal)
             result = True
-            time.sleep(2)
+            # Sleep to allow for the barista to put the items on the tray
+            time.sleep(10)
             if result:
                 userdata.task = "deliver order"
                 return "object_taken"
@@ -300,7 +301,8 @@ class HRI(smach.State):
             hri_goal.mode = 4  # Drop Item
             # result = self.call_hri_action(hri_goal)
             result = True
-            time.sleep(2)
+            # Sleep to allow for the customers to retrieve the orders
+            time.sleep(12)
             if result:
                 return "order_delivered"
 
@@ -376,7 +378,7 @@ class ObjectDetection(smach.State):
             result = self.call_object_detect(object_detect_goal)
             # time.sleep(2)
             # result = True
-            if result.match:
+            if result.match
                 userdata.task = "take item"
                 return "correct_order"
             elif not result.match:
