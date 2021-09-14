@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<launch>
+	<!--  Navigation and Point of Interests  -->
+	<node pkg="sciroc_navigation"  type="navigation.py"	name="sciroc_navigation" output="screen"  required="true" respawn="false" args="--wait"/>
+	<node pkg="sciroc_poi_state"  type="poi_state.py"	name="sciroc_poi_state" output="screen"  required="true" respawn="false" args="--wait"/>
+	<!--  Overall logic and coordination  -->
+	<node pkg="sciroc_logic"  type="logic.py"	name="sciroc_logic" output="screen"  required="true" respawn="false" args="--wait"/>
+
+</launch>
