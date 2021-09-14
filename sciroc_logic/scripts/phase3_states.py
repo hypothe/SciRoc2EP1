@@ -33,11 +33,9 @@ from sciroc_objdet.msg import (
     ObjDetInterfaceGoal,
     ObjDetInterfaceResult,
 )
+
 # pal_head_manager control disable
-from pal_common_msgs.msg import (
-    DisableAction
-    DisableGoal
-)
+from pal_common_msgs.msg import DisableAction, DisableGoal
 import time
 
 counter = "counter"
@@ -94,9 +92,9 @@ class Navigate(smach.State):
 
     def execute(self, userdata):
         if userdata.task == "report order":
-            # result = self.call_nav_service(counter)
-            result = True
-            time.sleep(2)
+            result = self.call_nav_service(counter)
+            # result = True
+            # time.sleep(2)
             if result:
                 userdata.current_poi = counter
                 return "at_counter"
@@ -104,17 +102,19 @@ class Navigate(smach.State):
             table_req = GetTableObjectRequest()
             table_req.table_state = "current serving"
             table = get_table_by_state(table_req)
-            # result = self.call_nav_service(table.table_id)
-            time.sleep(2)
-            result = True
+            result = self.call_nav_service(table.table_id)
+            # time.sleep(2)
+            # result = True
             if result:
                 userdata.current_poi = table.table_id
                 userdata.task = "announce order arrival"
                 return "at_current_serving_table"
         if userdata.task == "go to default location":
-            time.sleep(2)
-            result = True
+            # time.sleep(2)
+            result = self.call_nav_service(counter)
+            # result = True
             if result:
+                userdata.current_poi = counter
                 return "at_default_location"
 
 
@@ -241,9 +241,9 @@ class HRI(smach.State):
         if userdata.task == "report order":
             hri_goal.mode = 0  # Announce Text
             hri_goal.text = self.get_announce_text(task=userdata.task)
-            # result = self.call_hri_action(hri_goal)
-            time.sleep(2)
-            result = True
+            result = self.call_hri_action(hri_goal)
+            # time.sleep(2)
+            # result = True
             if result:
                 userdata.task = "check object"
                 return "order_reported"
@@ -253,9 +253,9 @@ class HRI(smach.State):
             hri_goal.text = self.get_announce_text(
                 task=userdata.task, missing=userdata.missing_drinks
             )
-            # result = self.call_hri_action(hri_goal)
-            result = True
-            time.sleep(2)
+            result = self.call_hri_action(hri_goal)
+            # result = True
+            # time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "missing_reported"
@@ -265,9 +265,9 @@ class HRI(smach.State):
             hri_goal.text = self.get_announce_text(
                 task=userdata.task, wrong=userdata.wrong_drinks
             )
-            # result = self.call_hri_action(hri_goal)
-            result = True
-            time.sleep(2)
+            result = self.call_hri_action(hri_goal)
+            # result = True
+            # time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "wrong_reported"
@@ -279,26 +279,28 @@ class HRI(smach.State):
                 wrong=userdata.wrong_drinks,
                 missing=userdata.missing_drinks,
             )
-            # result = self.call_hri_action(hri_goal)
-            result = True
-            time.sleep(2)
+            result = self.call_hri_action(hri_goal)
+            # result = True
+            # time.sleep(2)
             if result:
                 userdata.task = "check object"
                 return "wrong_and_missing_order_reported"
 
         elif userdata.task == "take item":
             hri_goal.mode = 3  # Take Item
-            # result = self.call_hri_action(hri_goal)
-            result = True
-            time.sleep(2)
+            result = self.call_hri_action(hri_goal)
+            # result = True
+            # Sleep to allow for the barista to put the items on the tray
+            # time.sleep(10)
             if result:
                 userdata.task = "deliver order"
                 return "object_taken"
         elif userdata.task == "announce order arrival":
             hri_goal.mode = 4  # Drop Item
-            # result = self.call_hri_action(hri_goal)
-            result = True
-            time.sleep(2)
+            result = self.call_hri_action(hri_goal)
+            # result = True
+            # Sleep to allow for the customers to retrieve the orders
+            # time.sleep(12)
             if result:
                 return "order_delivered"
 
@@ -353,7 +355,7 @@ class ObjectDetection(smach.State):
                 missing_drinks.append(drink)
         return missing_drinks
 
-    def execute(self, userdata):        
+    def execute(self, userdata):
         if self.head_ctrl_dsbl_client:
             dsbl_head_ctrl_goal = DisableGoal()
             # TODO: get this duration from param server, not hardcoded
@@ -369,13 +371,15 @@ class ObjectDetection(smach.State):
             object_detect_goal.mode = 2  # Comparison
             object_detect_goal.expected_tags = table.required_drinks
 
+            rospy.loginfo("ObjDet expected tags %s " % object_detect_goal.expected_tags)
+
             result = self.call_object_detect(object_detect_goal)
             # time.sleep(2)
             # result = True
-            if result:
+            if result.match:
                 userdata.task = "take item"
                 return "correct_order"
-            elif result == False:
+            elif not result.match:
                 # missing_drinks = ["", ""]
                 # wrong_drinks = []
                 missing_drinks = self.check_missing_drinks(

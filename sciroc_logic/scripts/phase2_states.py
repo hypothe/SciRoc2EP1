@@ -139,12 +139,12 @@ class HRI(smach.State):
         hri_goal = HRIGoal()
 
         hri_goal.mode = 1  # Take Order
-        # result = self.call_hri_action(hri_goal)
-        time.sleep(2)
-        result = True
+        result = self.call_hri_action(hri_goal)
+        #time.sleep(2)
+        #result = True
         if result:
             # userdata.order_list = result.required_drinks
-            userdata.order_list = ["fanta", "malt", "cocacola"]
+            userdata.order_list = ["fanta", "ringo", "cocacola"]
             return "order_taken"
 
 
@@ -182,6 +182,6 @@ class POI_State(smach.State):
         update_state_request_.current_serving = True
         update_state_request_.required_drinks = userdata.order_list
         result = self.call_poi_state_service(update_state_request=update_state_request_)
-        time.sleep(2)
+        #time.sleep(2)
         if result:
             return "updated"
